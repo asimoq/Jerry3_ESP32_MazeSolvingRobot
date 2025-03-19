@@ -38,7 +38,7 @@ void handlePidUpdate() {
   }
   
   if (server.hasArg("pid_p")) {
-    float ujErtek = server.arg("pid_p").toFloat();
+    double ujErtek = server.arg("pid_p").toDouble();
     Serial.print("Új P érték: ");
     Serial.println(ujErtek);
     
@@ -52,7 +52,7 @@ void handlePidUpdate() {
   }
   
   if (server.hasArg("pid_i")) {
-    float ujErtek = server.arg("pid_i").toFloat();
+    double ujErtek = server.arg("pid_i").toDouble();
     Serial.print("Új I érték: ");
     Serial.println(ujErtek);
     
@@ -66,7 +66,7 @@ void handlePidUpdate() {
   }
   
   if (server.hasArg("pid_d")) {
-    float ujErtek = server.arg("pid_d").toFloat();
+    double ujErtek = server.arg("pid_d").toDouble();
     Serial.print("Új D érték: ");
     Serial.println(ujErtek);
     

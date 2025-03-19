@@ -5,9 +5,9 @@
 #include <WebServer.h>
 
 // Külső változók deklarálása
-extern float Pid_P;
-extern float Pid_I;
-extern float Pid_D;
+extern double Pid_P;
+extern double Pid_I;
+extern double Pid_D;
 extern WebServer server;
 extern void beep(int number);
 
