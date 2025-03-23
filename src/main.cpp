@@ -68,6 +68,7 @@ double Pid_P = 15, Pid_I = 0.1, Pid_D = 5; // PID tényezők
 PID pid(&input, &output, &setpoint, Pid_P, Pid_I, Pid_D, DIRECT);
 
 double distanceFromSingleWall = 10; // hány cm-re van a fal ha csak egyhez igazodik 11.5
+double distanceFromSingleWallTreshold = distanceFromSingleWall; // mennyi a hiba amit még elfogad
 
 // RFID CONFIG
 #define RST_PIN 8
@@ -241,12 +242,10 @@ void turnLeft(double desiredangle)
 }
 
 // Eldönti hogy az adott irányban van e fal 0cm és 15cm között. Irányt és egy távoságok tömböt vár
-bool thereIsAWall(int direction, double distances[])
+bool thereIsAWall(int direction)
 {
-  double singleDistance;
-  singleDistance = distances[direction];
-  if (singleDistance >= 1 && singleDistance <= 22)
-    return true; // 22 kb jó
+  if (distances[direction] >= 1 && distances[direction] <= (distanceFromSingleWall + distanceFromSingleWallTreshold))
+    return true;
   else
     return false;
 }
@@ -316,7 +315,7 @@ void forwardWithAlignment(int maxSpeed)
 {
 
   // mindkét oldalt van fal
-  if (thereIsAWall(DIRECTION_LEFT, distances) && thereIsAWall(DIRECTION_RIGHT, distances))
+  if (thereIsAWall(DIRECTION_LEFT) && thereIsAWall(DIRECTION_RIGHT))
   {
 
     // Számold ki a középső távolságot a jobb és bal oldali távolságok alapján
@@ -325,7 +324,7 @@ void forwardWithAlignment(int maxSpeed)
     PidDrive(distanceFromMiddle, maxSpeed, true);
   }
   // balra van csak fal
-  if (thereIsAWall(DIRECTION_LEFT, distances) && !thereIsAWall(DIRECTION_RIGHT, distances))
+  if (thereIsAWall(DIRECTION_LEFT) && !thereIsAWall(DIRECTION_RIGHT))
   {
 
     // Számold ki a középső távolságot a jobb és bal oldali távolságok alapján
@@ -334,7 +333,7 @@ void forwardWithAlignment(int maxSpeed)
     PidDrive(distanceFromMiddle, maxSpeed, true);
   }
   // jobbra van csak fal
-  if (!thereIsAWall(DIRECTION_LEFT, distances) && thereIsAWall(DIRECTION_RIGHT, distances))
+  if (!thereIsAWall(DIRECTION_LEFT) && thereIsAWall(DIRECTION_RIGHT))
   {
 
     // Számold ki a középső távolságot a jobb és bal oldali távolságok alapján
@@ -343,7 +342,7 @@ void forwardWithAlignment(int maxSpeed)
     PidDrive(distanceFromMiddle, maxSpeed, true);
   }
   // Nincs fal mellette
-  if (!thereIsAWall(DIRECTION_LEFT, distances) && !thereIsAWall(DIRECTION_RIGHT, distances))
+  if (!thereIsAWall(DIRECTION_LEFT) && !thereIsAWall(DIRECTION_RIGHT))
   {
     float angle = mpu.getAngleZ();
     double error = (angle - lastCorrectAngle) * 0.07; // gyro alapján egyenesen a legutóbbi helyezkedéstől(falhoz igazítás vagy fordulás) számolva tartja a szöget elvileg :D
