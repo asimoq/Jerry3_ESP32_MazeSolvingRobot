@@ -48,12 +48,12 @@ int currentCommand;
 double howFareAreWeFromDestinacion;
 
 // motor pinek
-#define ENA 14 // bal
-#define IN2 27
-#define IN1 16
-#define IN4 17 // jobb
-#define IN3 25
-#define ENB 26
+#define ENB 14 // bal
+#define IN4 27
+#define IN3 16
+#define IN2 17 // jobb
+#define IN1 25
+#define ENA 26
 
 // motor speedek
 int turnMaxSpeed = 170;
@@ -470,7 +470,7 @@ void setup()
   mfrc522.PCD_Init();
   MFRC522Debug::PCD_DumpVersionToSerial(mfrc522, Serial);
   mfrc522.PCD_AntennaOn();
-  mfrc522.PCD_SetAntennaGain(0x00); // 0x07 = 48dB
+  mfrc522.PCD_SetAntennaGain(0x07); // 0x07 = 48dB
 
   pid.SetMode(AUTOMATIC);
   pid.SetOutputLimits(-255, 255);
@@ -495,7 +495,7 @@ void loop()
   //   drive(200, 200);
   // }
 
-  while (true)
+  while (false)
   {
     // measureDistanceAllDirections();
     // Serial.print("front:\t");
@@ -515,11 +515,11 @@ void loop()
   
   {
     measureDistanceAllDirections();
-    while (distances[DIRECTION_FRONT] > 10 || distances[DIRECTION_FRONT] < 2)
+    while (distances[DIRECTION_FRONT] > 10)
     {
       measureDistanceAllDirections();
 
-      forwardWithAlignment(100);
+      forwardWithAlignment(170);
       mpu.update();
       switch (rfidToDirection())
       {
