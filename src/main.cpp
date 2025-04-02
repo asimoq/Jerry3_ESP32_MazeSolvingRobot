@@ -21,9 +21,9 @@ unsigned long timer = 0;
 float lastCorrectAngle = 0;
 
 // IR sensor pins (analog inputs)
-#define IR_PIN_FRONT A1 // Front IR sensor connected to analog pin A1
-#define IR_PIN_RIGHT A2 // Right IR sensor connected to analog pin A2
-#define IR_PIN_LEFT A0  // Left IR sensor connected to analog pin A0
+#define IR_PIN_FRONT 34 // Front IR sensor connected to analog pin A1
+#define IR_PIN_RIGHT 36 // Right IR sensor connected to analog pin A2
+#define IR_PIN_LEFT 39  // Left IR sensor connected to analog pin A0
 
 const char *ssid = "Bende_iphone";
 const char *password = "Pass1234$";
@@ -43,12 +43,12 @@ int currentCommand;
 double howFareAreWeFromDestinacion;
 
 // motor pinek
-#define ENA 5 // bal
-#define IN1 3
-#define IN2 4
-#define IN3 10 // jobb
-#define IN4 7
-#define ENB 6
+#define ENA 14 // bal
+#define IN2 27
+#define IN1 16
+#define IN4 17 // jobb
+#define IN3 25
+#define ENB 26
 
 // motor speedek
 int turnMaxSpeed = 170;
@@ -71,8 +71,8 @@ double distanceFromSingleWall = 10; // hány cm-re van a fal ha csak egyhez igaz
 double distanceFromSingleWallTreshold = distanceFromSingleWall; // mennyi a hiba amit még elfogad
 
 // RFID CONFIG
-#define RST_PIN 8
-#define SS_PIN 9
+#define RST_PIN 13
+#define SS_PIN 5
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 MFRC522::MIFARE_Key key;
 
@@ -458,7 +458,7 @@ void setup()
   startupTone();
   // PID webinterface inicializálása és indítása
   Serial.println("\n\nPID Webinterface indítása...");
-  setupPidWebInterface(ssid, password);
+  //setupPidWebInterface(ssid, password);
 
   // gyro beállítása
   Wire.begin();
@@ -483,6 +483,8 @@ void setup()
   pinMode(ENB, OUTPUT);
 
   // RFID kártyaolvasó inicializálása
+
+  
   SPI.begin();
   mfrc522.PCD_Init();
   // Prepare key - all keys are set to FFFFFFFFFFFFh at chip delivery from the factory.
@@ -490,6 +492,7 @@ void setup()
   {
     key.keyByte[i] = 0xFF;
   }
+  
 
   pid.SetMode(AUTOMATIC);
   pid.SetOutputLimits(-255, 255);
@@ -506,13 +509,13 @@ void loop()
 {
   // Webszerver kérések kezelése
 
-  handlePidWebClient();
+  //handlePidWebClient();
 
   // Itt jöhet a többi kód, ami nem kapcsolódik a webszerverhezwhile (true)
-  while (true)
-  {
-    /* code */
-  }
+  // while (true)
+  // {
+  //   drive(200, 200);
+  // }
   
   {
     measureDistanceAllDirections();
