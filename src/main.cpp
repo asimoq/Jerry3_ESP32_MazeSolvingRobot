@@ -2,11 +2,16 @@
 #include <Arduino.h>
 #include <MPU6050_light.h> //gyro könyvtár
 #include <SPI.h>
-#include <MFRC522.h>
+#include <MFRC522v2.h> // RFID könyvtár
+#include <MFRC522DriverSPI.h>
+#include <MFRC522DriverPinSimple.h>
+#include <MFRC522Debug.h>
+
 #include <string.h>
 #include <stdio.h>
 #include "Wire.h"
 #include <PID_v1.h>
+#include <math.h>
 
 #define DIRECTION_FRONT 0    // 0-egyenesen
 #define DIRECTION_LEFT 1     // 1-balra
@@ -21,9 +26,9 @@ unsigned long timer = 0;
 float lastCorrectAngle = 0;
 
 // IR sensor pins (analog inputs)
-#define IR_PIN_FRONT 34 // Front IR sensor connected to analog pin A1
+#define IR_PIN_LEFT 34 // Front IR sensor connected to analog pin A1
 #define IR_PIN_RIGHT 36 // Right IR sensor connected to analog pin A2
-#define IR_PIN_LEFT 39  // Left IR sensor connected to analog pin A0
+#define IR_PIN_FRONT 39  // Left IR sensor connected to analog pin A0
 
 const char *ssid = "Bende_iphone";
 const char *password = "Pass1234$";
@@ -33,7 +38,7 @@ WebServer server(80);
 
 // A három változó, amit a felhasználó módosíthat
 
-const int buzzerPin = 26;
+#define BUZZER_PIN 12
 
 double distances[3];
 double lastDistances[3];
@@ -55,8 +60,8 @@ int turnMaxSpeed = 170;
 int turnMinSpeed = 75;
 int turnProportionalSpeed = turnMaxSpeed - turnMinSpeed;
 
-int forwardMaxSpeed = 90;
-int forwardMinSpeed = 78;
+int forwardMaxSpeed = 200;
+int forwardMinSpeed = 140;
 int forwardProportionalSpeed = forwardMaxSpeed - forwardMinSpeed;
 
 // PID változók   //100 hoz egsz okes: 0.3 0.3 0.9  //60hoz:
@@ -73,17 +78,19 @@ double distanceFromSingleWallTreshold = distanceFromSingleWall; // mennyi a hiba
 // RFID CONFIG
 #define RST_PIN 13
 #define SS_PIN 5
-MFRC522 mfrc522(SS_PIN, RST_PIN);
-MFRC522::MIFARE_Key key;
+MFRC522DriverPinSimple ss_pin(SS_PIN);
+MFRC522DriverSPI driver{ss_pin};
+MFRC522 mfrc522{driver}; 
+
 
 void beep(int number)
 {
   // 1000 Hz-es hang generálása
   for (size_t i = 0; i < number; i++)
   {
-    tone(buzzerPin, 1000 / (i + 1));
+    tone(BUZZER_PIN, 1000 / (i + 1));
     delay(250 / number); // Fél másodpercig töredékéig szól amekkora szám annyi részre osztja
-    noTone(buzzerPin);
+    noTone(BUZZER_PIN);
     delay(250 / number); // Fél másodpercig töredékéig csönd amekkora szám annyi részre osztja
   }
 }
@@ -91,9 +98,9 @@ void startupTone()
 {
   for (size_t i = 5; i > 0; i--)
   {
-    tone(buzzerPin, 1000 / (i + 1));
+    tone(BUZZER_PIN, 1000 / (i + 1));
     delay(250 / i); // Fél másodpercig töredékéig szól amekkora szám annyi részre osztja
-    noTone(buzzerPin);
+    noTone(BUZZER_PIN);
     delay(250 / i); // Fél másodpercig töredékéig csönd amekkora szám annyi részre osztja
   }
 }
@@ -136,36 +143,7 @@ void drive(int motorSpeedLeft, int motorSpeedRight)
 //  TÁVOLSÁGMÉRÉS CM-BEN IR szenzorral
 double measureDistance(int analogPin)
 {
-
-  int sensorValue = analogRead(analogPin); // IR szenzor analóg értékének beolvasása
-
-  // Az alábbiakban egy példa konverziót használunk, ami az IR szenzor jellegzetességeitől függ.
-  // A gyártó specifikációja szerint egy konkrét érzékelési görbe van, amit ki kell számolni.
-  // Egy egyszerű példa alapján (lineáris közelítés, de a szenzorra specifikus görbét kell használni):
-
-  double voltage = sensorValue * (5.0 / 1023.0); // Feszültség számítása (5V a referencia feszültség)
-
-  // A szenzor adatlapján található feszültség-távolság görbe alapján kell meghatározni a képletet.
-  // Például egy egyszerű konverzió 4 cm és 30 cm közötti távolságra:
-
-  if (voltage == 0)
-    return 0; // Ha a feszültség 0, nincs mért távolság
-
-  // A távolság kiszámítása a feszültség alapján (ez egy példaképlet, pontos görbe kell)
-  double distanceCm = (4 / (voltage - 0.042)) - 0.42;
-
-  // Az érzékelési tartományon kívül eső értékek szűrése
-  if (distanceCm < 2)
-  {
-    return 0; // Érzékelési tartományon kívül
-  }
-
-  if (distanceCm > 45.0)
-  {
-    return 45; // Érzékelési tartományon kívül
-  }
-
-  return distanceCm;
+  return  4600.5 * pow(map(analogRead(analogPin), 0, 1023, 0, 5000), -0.94);
 }
 
 // Előre haladás
@@ -305,9 +283,9 @@ double measureFrontDistanceWithFilter(int trigerpin)
 // feltölt egy double tömböt távolságokkal - előre, balra és jobbra mér
 void measureDistanceAllDirections()
 {
-  distances[DIRECTION_FRONT] = measureDistance(IR_PIN_FRONT);
-  distances[DIRECTION_RIGHT] = measureDistance(IR_PIN_RIGHT);
-  distances[DIRECTION_LEFT] = measureDistance(IR_PIN_LEFT);
+  distances[DIRECTION_FRONT] = measureDistance(IR_PIN_FRONT)*6;
+  distances[DIRECTION_RIGHT] = measureDistance(IR_PIN_RIGHT)*4;
+  distances[DIRECTION_LEFT] = measureDistance(IR_PIN_LEFT)*4;
 }
 
 // összetett függvény ami a körülötte lévő falak számától függően középre rendezi a robotot miközben előrefele halad.
@@ -354,6 +332,7 @@ void forwardWithAlignment(int maxSpeed)
 //  dirs pointer opcionális az első fordulóban.
 int rfidToDirection(int *dirs = nullptr)
 {
+  delay(50);
   int retVal[4] = {0};
   if (dirs == nullptr)
   {
@@ -362,6 +341,7 @@ int rfidToDirection(int *dirs = nullptr)
 
   if (mfrc522.PICC_IsNewCardPresent())
   {
+    beep(1);
     if (mfrc522.PICC_ReadCardSerial())
     {
       if ((mfrc522.uid.uidByte[1] == 0xBC))
@@ -425,6 +405,7 @@ int rfidToDirection(int *dirs = nullptr)
           break;
         }
       }
+      mfrc522.PICC_HaltA();
       return dirs[0];
     }
   }
@@ -450,7 +431,7 @@ void orientRobot(double desiredAngle)
 void setup()
 {
   delay(2000);
-  pinMode(buzzerPin, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
 
   // Soros kommunikáció inicializálása
   Serial.begin(115200);
@@ -487,12 +468,9 @@ void setup()
   
   SPI.begin();
   mfrc522.PCD_Init();
-  // Prepare key - all keys are set to FFFFFFFFFFFFh at chip delivery from the factory.
-  for (byte i = 0; i < 6; i++)
-  {
-    key.keyByte[i] = 0xFF;
-  }
-  
+  MFRC522Debug::PCD_DumpVersionToSerial(mfrc522, Serial);
+  mfrc522.PCD_AntennaOn();
+  mfrc522.PCD_SetAntennaGain(0x00); // 0x07 = 48dB
 
   pid.SetMode(AUTOMATIC);
   pid.SetOutputLimits(-255, 255);
@@ -516,6 +494,24 @@ void loop()
   // {
   //   drive(200, 200);
   // }
+
+  while (true)
+  {
+    // measureDistanceAllDirections();
+    // Serial.print("front:\t");
+    // Serial.print(distances[DIRECTION_FRONT]);
+    // Serial.print("\tleft:\t");
+    // Serial.print(distances[DIRECTION_LEFT]);
+    // Serial.print("\tright:\t");
+    // Serial.println(distances[DIRECTION_RIGHT]);
+    // delay(500);
+    if(mfrc522.PICC_IsNewCardPresent()){
+      Serial.println("RFID kártya olvasva");
+      beep(3);
+    }
+    
+  }
+  
   
   {
     measureDistanceAllDirections();
