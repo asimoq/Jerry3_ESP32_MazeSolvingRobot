@@ -170,7 +170,7 @@ void stop()
 }
 
 // Balra fordulás 90 fok
-void turnRight(double desiredangle)
+void turnLeft(double desiredangle)
 {
 
   mpu.update();                       // gyro frissítése
@@ -196,7 +196,7 @@ void turnRight(double desiredangle)
 }
 
 // Jobbra fordulás 90 fok. Magyarázatért look up turnLeft()
-void turnLeft(double desiredangle)
+void turnRight(double desiredangle)
 {
   mpu.update();
   float startAngle = mpu.getAngleZ(); // gyro mérése és aktuális állapot mentése
