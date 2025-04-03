@@ -26,9 +26,9 @@ unsigned long timer = 0;
 float lastCorrectAngle = 0;
 
 // IR sensor pins (analog inputs)
-#define IR_PIN_LEFT 34 // Front IR sensor connected to analog pin A1
+#define IR_PIN_LEFT 34  // Front IR sensor connected to analog pin A1
 #define IR_PIN_RIGHT 36 // Right IR sensor connected to analog pin A2
-#define IR_PIN_FRONT 39  // Left IR sensor connected to analog pin A0
+#define IR_PIN_FRONT 39 // Left IR sensor connected to analog pin A0
 
 const char *ssid = "Bende_iphone";
 const char *password = "Pass1234$";
@@ -39,6 +39,8 @@ WebServer server(80);
 // A három változó, amit a felhasználó módosíthat
 
 #define BUZZER_PIN 12
+
+const int buttonPin = 2; // A gomb a GPIO2-höz van csatlakoztatva
 
 double distances[3];
 double lastDistances[3];
@@ -56,12 +58,12 @@ double howFareAreWeFromDestinacion;
 #define ENA 26
 
 // motor speedek
-int turnMaxSpeed = 170;
-int turnMinSpeed = 75;
+int turnMaxSpeed = 190;
+int turnMinSpeed = 110;
 int turnProportionalSpeed = turnMaxSpeed - turnMinSpeed;
 
-int forwardMaxSpeed = 200;
-int forwardMinSpeed = 140;
+int forwardMaxSpeed = 180;
+int forwardMinSpeed = 110;
 int forwardProportionalSpeed = forwardMaxSpeed - forwardMinSpeed;
 
 // PID változók   //100 hoz egsz okes: 0.3 0.3 0.9  //60hoz:
@@ -69,10 +71,10 @@ int pidmode = 2;
 double setpoint = 0; // Kívánt érték
 double input, output;
 // double Kp1 = 30, Ki1 = 0, Kd1 = 30; // PID tényezők
-double Pid_P = 15, Pid_I = 0.1, Pid_D = 5; // PID tényezők
+double Pid_P = 1, Pid_I = 0, Pid_D = 0; // PID tényezők
 PID pid(&input, &output, &setpoint, Pid_P, Pid_I, Pid_D, DIRECT);
 
-double distanceFromSingleWall = 10; // hány cm-re van a fal ha csak egyhez igazodik 11.5
+double distanceFromSingleWall = 10;                             // hány cm-re van a fal ha csak egyhez igazodik 11.5
 double distanceFromSingleWallTreshold = distanceFromSingleWall; // mennyi a hiba amit még elfogad
 
 // RFID CONFIG
@@ -80,8 +82,148 @@ double distanceFromSingleWallTreshold = distanceFromSingleWall; // mennyi a hiba
 #define SS_PIN 5
 MFRC522DriverPinSimple ss_pin(SS_PIN);
 MFRC522DriverSPI driver{ss_pin};
-MFRC522 mfrc522{driver}; 
+MFRC522 mfrc522{driver};
 
+void beep(int number);
+void startupTone();
+void checkButton();
+void drive(int motorSpeedLeft, int motorSpeedRight);
+double measureDistance(int analogPin);
+void forward();
+void backward();
+void stop();
+void turnLeft(double desiredangle);
+void turnRight(double desiredangle);
+bool thereIsAWall(int direction);
+void PidDrive(double distanceFromMiddle, int maxSpeed, bool isThereAWall);
+double measureFrontDistanceWithFilter(int trigerpin);
+void measureDistanceAllDirections();
+void forwardWithAlignment(int maxSpeed);
+int rfidToDirection(int *dirs);
+void orientRobot(double desiredAngle);
+void handlePidSettings();
+
+void setup()
+{
+  delay(1000);
+  pinMode(BUZZER_PIN, OUTPUT);
+
+  // Soros kommunikáció inicializálása
+  Serial.begin(115200);
+  startupTone();
+  // PID webinterface inicializálása és indítása
+  Serial.println("\n\nPID Webinterface indítása...");
+  setupPidWebInterface(ssid, password);
+  Serial.println("PID Webinterface elindult");
+  Serial.println("PID Webinterface elérhető a következő címen: ");
+  Serial.println(WiFi.localIP());
+
+  // gyro beállítása
+  Wire.begin();
+  byte status = mpu.begin();
+  Serial.print(F("MPU6050 status: "));
+  Serial.println(status);
+  while (status != 0)
+  {
+  } // stop everything if could not connect to MPU6050
+
+  Serial.println(F("Calculating offsets, do not move MPU6050"));
+  delay(1000);
+  mpu.calcOffsets(); // gyro and accelero
+  Serial.println("Done!\n");
+
+  // Motorvezérlő pin-ek beállítása
+  pinMode(ENA, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  pinMode(ENB, OUTPUT);
+
+  pinMode(buttonPin, OUTPUT); // Gomb bemenetének beállítása
+
+  // RFID kártyaolvasó inicializálása
+
+  SPI.begin();
+  mfrc522.PCD_Init();
+  MFRC522Debug::PCD_DumpVersionToSerial(mfrc522, Serial);
+  mfrc522.PCD_AntennaOn();
+  mfrc522.PCD_SetAntennaGain(0x07); // 0x07 = 48dB
+
+  pid.SetMode(AUTOMATIC);
+  pid.SetOutputLimits(-255, 255);
+  pid.SetSampleTime(25);
+
+  mpu.update();
+  lastCorrectAngle = mpu.getAngleZ();
+
+  commands[0] = 0;
+  currentCommand = 0;
+
+  delay(1000);
+  beep(3);
+  // várunk a gomb megnyomására
+  while (digitalRead(buttonPin) == LOW)
+  {
+    delay(100);
+  }
+  {
+    beep(3);
+    delay(500);
+  }
+}
+
+void loop()
+{
+  // PID webinterface kezelése
+  measureDistanceAllDirections();
+  handlePidSettings();
+  pid.SetTunings(Pid_P, Pid_I, Pid_D);
+  while (distances[DIRECTION_FRONT] > 10)
+  {
+    measureDistanceAllDirections();
+    handlePidSettings();
+    forwardWithAlignment(170);
+    mpu.update();
+    switch (rfidToDirection(commands))
+    {
+    case DIRECTION_LEFT:
+      delay(1000);
+      turnLeft(85);
+      break;
+    case DIRECTION_RIGHT:
+      delay(1000);
+      turnRight(85);
+      break;
+    case DIRECTION_STOP:
+      stop();
+      drive(90, -90);
+      delay(2000);
+      while (true)
+      {
+        stop();
+      }
+      break;
+
+    default:
+      break;
+    }
+  }
+  stop();
+  if (distances[DIRECTION_LEFT] >= distances[DIRECTION_RIGHT])
+  {
+    turnLeft(85);
+  }
+  else
+  {
+    turnRight(85);
+  }
+}
+
+void handlePidSettings(){
+  handlePidWebClient();
+  pid.SetTunings(Pid_P, Pid_I, Pid_D);
+}
 
 void beep(int number)
 {
@@ -94,6 +236,7 @@ void beep(int number)
     delay(250 / number); // Fél másodpercig töredékéig csönd amekkora szám annyi részre osztja
   }
 }
+
 void startupTone()
 {
   for (size_t i = 5; i > 0; i--)
@@ -102,6 +245,26 @@ void startupTone()
     delay(250 / i); // Fél másodpercig töredékéig szól amekkora szám annyi részre osztja
     noTone(BUZZER_PIN);
     delay(250 / i); // Fél másodpercig töredékéig csönd amekkora szám annyi részre osztja
+  }
+}
+
+void checkButton()
+{
+  if (digitalRead(buttonPin) == HIGH)
+  {
+    stop();
+    beep(3);
+    delay(500);
+    while (digitalRead(buttonPin) == LOW)
+    {
+      delay(100);
+      handlePidSettings();
+      measureDistanceAllDirections();
+    }
+    {
+      beep(3);
+      delay(500);
+    }
   }
 }
 
@@ -137,13 +300,14 @@ void drive(int motorSpeedLeft, int motorSpeedRight)
   // Motorok sebességének beállítása
   analogWrite(ENA, motorSpeedLeft);
   analogWrite(ENB, motorSpeedRight);
+  checkButton();
 }
 
 // TÁVOLSÁGMÉRÉS CM-BEN
 //  TÁVOLSÁGMÉRÉS CM-BEN IR szenzorral
 double measureDistance(int analogPin)
 {
-  return  4600.5 * pow(map(analogRead(analogPin), 0, 1023, 0, 5000), -0.94);
+  return 4600.5 * pow(map(analogRead(analogPin), 0, 1023, 0, 5000), -0.94);
 }
 
 // Előre haladás
@@ -280,12 +444,13 @@ double measureFrontDistanceWithFilter(int trigerpin)
   avg = sum / numberOfMeasurements;
   return avg;
 }
+
 // feltölt egy double tömböt távolságokkal - előre, balra és jobbra mér
 void measureDistanceAllDirections()
 {
-  distances[DIRECTION_FRONT] = measureDistance(IR_PIN_FRONT)*6;
-  distances[DIRECTION_RIGHT] = measureDistance(IR_PIN_RIGHT)*4;
-  distances[DIRECTION_LEFT] = measureDistance(IR_PIN_LEFT)*4;
+  distances[DIRECTION_FRONT] = measureDistance(IR_PIN_FRONT) * 6;
+  distances[DIRECTION_RIGHT] = measureDistance(IR_PIN_RIGHT) * 4;
+  distances[DIRECTION_LEFT] = measureDistance(IR_PIN_LEFT) * 4;
 }
 
 // összetett függvény ami a körülötte lévő falak számától függően középre rendezi a robotot miközben előrefele halad.
@@ -426,135 +591,4 @@ void orientRobot(double desiredAngle)
       turnLeft(abs(mpu.getAngleZ() - desiredAngle) / 2);
     }
   }
-}
-
-void setup()
-{
-  delay(2000);
-  pinMode(BUZZER_PIN, OUTPUT);
-
-  // Soros kommunikáció inicializálása
-  Serial.begin(115200);
-  beep(3);
-  startupTone();
-  // PID webinterface inicializálása és indítása
-  Serial.println("\n\nPID Webinterface indítása...");
-  //setupPidWebInterface(ssid, password);
-
-  // gyro beállítása
-  Wire.begin();
-  byte status = mpu.begin();
-  Serial.print(F("MPU6050 status: "));
-  Serial.println(status);
-  while (status != 0)
-  {
-  } // stop everything if could not connect to MPU6050
-
-  Serial.println(F("Calculating offsets, do not move MPU6050"));
-  delay(1000);
-  mpu.calcOffsets(); // gyro and accelero
-  Serial.println("Done!\n");
-
-  // Motorvezérlő pin-ek beállítása
-  pinMode(ENA, OUTPUT);
-  pinMode(IN1, OUTPUT);
-  pinMode(IN2, OUTPUT);
-  pinMode(IN3, OUTPUT);
-  pinMode(IN4, OUTPUT);
-  pinMode(ENB, OUTPUT);
-
-  // RFID kártyaolvasó inicializálása
-
-  
-  SPI.begin();
-  mfrc522.PCD_Init();
-  MFRC522Debug::PCD_DumpVersionToSerial(mfrc522, Serial);
-  mfrc522.PCD_AntennaOn();
-  mfrc522.PCD_SetAntennaGain(0x07); // 0x07 = 48dB
-
-  pid.SetMode(AUTOMATIC);
-  pid.SetOutputLimits(-255, 255);
-  pid.SetSampleTime(25);
-
-  mpu.update();
-  lastCorrectAngle = mpu.getAngleZ();
-
-  commands[0] = 0;
-  currentCommand = 0;
-}
-
-void loop()
-{
-  // Webszerver kérések kezelése
-
-  //handlePidWebClient();
-
-  // Itt jöhet a többi kód, ami nem kapcsolódik a webszerverhezwhile (true)
-  // while (true)
-  // {
-  //   drive(200, 200);
-  // }
-
-  while (false)
-  {
-    // measureDistanceAllDirections();
-    // Serial.print("front:\t");
-    // Serial.print(distances[DIRECTION_FRONT]);
-    // Serial.print("\tleft:\t");
-    // Serial.print(distances[DIRECTION_LEFT]);
-    // Serial.print("\tright:\t");
-    // Serial.println(distances[DIRECTION_RIGHT]);
-    // delay(500);
-    if(mfrc522.PICC_IsNewCardPresent()){
-      Serial.println("RFID kártya olvasva");
-      beep(3);
-    }
-    
-  }
-  
-  
-  {
-    measureDistanceAllDirections();
-    while (distances[DIRECTION_FRONT] > 10)
-    {
-      measureDistanceAllDirections();
-
-      forwardWithAlignment(170);
-      mpu.update();
-      switch (rfidToDirection())
-      {
-      case DIRECTION_LEFT:
-        delay(1000);
-        turnLeft(85);
-        break;
-      case DIRECTION_RIGHT:
-        delay(1000);
-        turnRight(85);
-        break;
-      case DIRECTION_STOP:
-        stop();
-        drive(90, -90);
-        delay(2000);
-        while (true)
-        {
-          stop();
-        }
-        break;
-
-      default:
-        break;
-      }
-    }
-    stop();
-    if (distances[DIRECTION_LEFT] >= distances[DIRECTION_RIGHT])
-    {
-      turnLeft(85);
-    }
-    else
-    {
-      turnRight(85);
-    }
-  }
-
-  // while (true)
 }
