@@ -23,7 +23,7 @@ form { max-width: 400px; margin: 0 auto; padding: 10px; border: 1px solid #ddd; 
 input[type=number], input[type=text] { width: 100%; padding: 12px 20px; margin: 8px 0; box-sizing: border-box; }
 input[type=submit] { background-color:rgb(76, 153, 175); color: white; padding: 5px 10px; margin: 8px 0; border: none; border-radius: 4px; cursor: pointer; width: 100%; }
 input[type=submit]:hover { background-color:rgb(69, 116, 160); }
-.param-group { margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #eee; }
+.param-group { margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #eee; }
 .success-message { color: green; font-weight: bold; margin: 5px 0; }
 .slider-container { display: flex; align-items: center; margin: 5px 0; }
 .slider { flex-grow: 1; margin-right: 5px; }
@@ -33,12 +33,10 @@ input[type=submit]:hover { background-color:rgb(69, 116, 160); }
 <body>
 <h2>ESP32 PID Beallito</h2>
 %SUCCESS_MESSAGE%
-<form action="/update" method="post">
-  
+<form action="/update" method="post">  
 <div class="param-group">
 <h3>P (Proportional)</h3>
 <p>Jelenlegi ertek: %PID_P%</p>
-<label for="pid_p">Uj ertek:</label>
 <!-- Mobilbarát tizedestört beviteli mező -->
 <input type="text" inputmode="decimal" id="pid_p" name="pid_p" value="%PID_P%" step="0.01">
 <div class="slider-container">
@@ -50,7 +48,7 @@ input[type=submit]:hover { background-color:rgb(69, 116, 160); }
 <div class="param-group">
 <h3>I (Integral)</h3>
 <p>Jelenlegi ertek: %PID_I%</p>
-<label for="pid_i">Uj ertek:</label>
+
 <!-- Mobilbarát tizedestört beviteli mező -->
 <input type="text" inputmode="decimal" id="pid_i" name="pid_i" value="%PID_I%" step="0.01">
 <div class="slider-container">
@@ -62,7 +60,7 @@ input[type=submit]:hover { background-color:rgb(69, 116, 160); }
 <div class="param-group">
 <h3>D (Derivative)</h3>
 <p>Jelenlegi ertek: %PID_D%</p>
-<label for="pid_d">Uj ertek:</label>
+
 <!-- Mobilbarát tizedestört beviteli mező -->
 <input type="text" inputmode="decimal" id="pid_d" name="pid_d" value="%PID_D%" step="0.01">
 <div class="slider-container">
