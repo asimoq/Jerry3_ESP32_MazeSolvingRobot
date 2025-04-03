@@ -1,6 +1,13 @@
 #include "pid_webinterface.h"
 #include <vector>
 
+#define DIRECTION_FRONT 0    // 0-egyenesen
+#define DIRECTION_LEFT 1     // 1-balra
+#define DIRECTION_RIGHT 2    // 2-jobbra
+#define DIRECTION_STOP 3     // megállás
+#define DIRECTION_START 4    // START
+#define DIRECTION_DEAD_END 5 // Zsákutca
+
 struct WebVariable
 {
   String id;          // Egyedi azonosító (formok/HTML elemek számára)
@@ -50,6 +57,12 @@ String generateHtml()
   <div class="container">
       <h1>ESP32 Változó Beállító</h1>
       %SUCCESS_MESSAGE%
+      <div id="distances">
+      <h2>Távolságok</h2>
+      <p>Elöl: <span id="distance-front"></span> cm</p>
+      <p>Bal: <span id="distance-left"></span> cm</p>
+      <p>Jobb: <span id="distance-right"></span> cm</p>
+      </div>
       <form action="/update" method="post">
 )=====";
 
@@ -74,6 +87,19 @@ String generateHtml()
       </form>
   </div>
 </body>
+<script>
+function updateDistances() {
+  fetch('/distances')
+    .then(response => response.json())
+    .then(data => {
+      document.getElementById('distance-front').textContent = data.front;
+      document.getElementById('distance-left').textContent = data.left;
+      document.getElementById('distance-right').textContent = data.right;
+    });
+}
+
+setInterval(updateDistances, 100); // Frissítés másodpercenként
+</script>
 </html>
 )=====";
 
@@ -160,6 +186,13 @@ void handleUpdate()
   server.send(302, "text/plain", "");
 }
 
+void handleDistances() {
+  String json = "{\"front\":" + String(distances[DIRECTION_FRONT]) + 
+                ",\"left\":" + String(distances[DIRECTION_LEFT]) + 
+                ",\"right\":" + String(distances[DIRECTION_RIGHT]) + "}";
+  server.send(200, "application/json", json);
+}
+
 void setupPidWebInterface(const char *ssid, const char *password)
 {
   // Csatlakozás a WiFi hálózathoz
@@ -183,6 +216,7 @@ void setupPidWebInterface(const char *ssid, const char *password)
   // Útvonalak beállítása a webszerverhez
   server.on("/", HTTP_GET, handleRoot);
   server.on("/update", HTTP_POST, handleUpdate);
+  server.on("/distances", HTTP_GET, handleDistances);
 
   // Webszerver indítása
   server.begin();
@@ -192,6 +226,8 @@ void setupPidWebInterface(const char *ssid, const char *password)
   addWebVariable("pid_i", "I (Integral)", "Integráló tag", &Pid_I, 0, 200);
   addWebVariable("pid_d", "D (Derivative)", "Differenciáló tag", &Pid_D, 0, 200);
   addWebVariable("single_wall", "Faltól tartott távolság", "Távolság(cm)", &distanceFromSingleWall, 0, 50);
+  addWebVariable("forward_max_speed", "Maximális sebesség", "Sebesség(0-255)", &forwardMaxSpeed, 0, 255);
+  addWebVariable("")
 }
 
 void handlePidWebClient()

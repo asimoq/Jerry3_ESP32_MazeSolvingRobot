@@ -31,6 +31,21 @@ float lastCorrectAngle = 0;
 #define IR_PIN_RIGHT 36 // Right IR sensor connected to analog pin A2
 #define IR_PIN_FRONT 39 // Left IR sensor connected to analog pin A0
 
+struct KalmanFilter {
+  double estimate;     // Becsült érték
+  double errorCovariance;  // Becslési hiba kovariancia
+  double processNoise; // Folyamat zaj (Q)
+  double measurementNoise; // Mérési zaj (R)
+};
+
+KalmanFilter frontKalman = {0, 1.0, 0.01, 0.1};  // Elülső szenzor
+KalmanFilter leftKalman = {0, 1.0, 0.01, 0.1};   // Bal oldali szenzor
+KalmanFilter rightKalman = {0, 1.0, 0.01, 0.1};  // Jobb oldali szenzor
+
+double distanceFromSingleWall = 10;   // hány cm-re van a fal ha csak egyhez igazodik 11.5
+double distanceFromSingleWallTreshold = distanceFromSingleWall;
+double distanceFromFrontWall = 10;  // mennyire van messze az elötte lévő fal
+
 const char *ssid = "Bende_iphone";
 const char *password = "Pass1234$";
 
@@ -44,11 +59,8 @@ WebServer server(80);
 const int buttonPin = 2; // A gomb a GPIO2-höz van csatlakoztatva
 
 double distances[3];
-double lastDistances[3];
-bool isFirstMeasurement = true;
 int commands[256];
 int currentCommand;
-double howFareAreWeFromDestinacion;
 
 // motor pinek
 #define ENB 14 // bal
@@ -75,8 +87,7 @@ double input, output;
 double Pid_P = 1, Pid_I = 0, Pid_D = 0; // PID tényezők
 PID pid(&input, &output, &setpoint, Pid_P, Pid_I, Pid_D, DIRECT);
 
-double distanceFromSingleWall = 10;                             // hány cm-re van a fal ha csak egyhez igazodik 11.5
-double distanceFromSingleWallTreshold = distanceFromSingleWall; // mennyi a hiba amit még elfogad
+
 
 // RFID CONFIG
 #define RST_PIN 13
@@ -90,6 +101,7 @@ void startupTone();
 void checkButton();
 void drive(int motorSpeedLeft, int motorSpeedRight);
 double measureDistance(int analogPin);
+double measureFrontDistance(int analogPin);
 void forward();
 void backward();
 void stop();
@@ -103,6 +115,7 @@ void forwardWithAlignment(int maxSpeed);
 int rfidToDirection(int *dirs);
 void orientRobot(double desiredAngle);
 void handlePidSettings();
+double kalmanFilter(double measurement, KalmanFilter* filter);
 
 void setup()
 {
@@ -180,11 +193,11 @@ void loop()
   measureDistanceAllDirections();
   handlePidSettings();
   pid.SetTunings(Pid_P, Pid_I, Pid_D);
-  while (distances[DIRECTION_FRONT] > 7)
+  while (distances[DIRECTION_FRONT] > distanceFromFrontWall)
   {
     measureDistanceAllDirections();
     handlePidSettings();
-    forwardWithAlignment(170);
+    forwardWithAlignment(forwardMaxSpeed);
     mpu.update();
     switch (rfidToDirection(commands))
     {
@@ -309,9 +322,91 @@ void drive(int motorSpeedLeft, int motorSpeedRight)
 
 // TÁVOLSÁGMÉRÉS CM-BEN
 //  TÁVOLSÁGMÉRÉS CM-BEN IR szenzorral
-double measureDistance(int analogPin)
-{
-  return 4600.5 * pow(map(analogRead(analogPin), 0, 1023, 0, 5000), -0.94);
+double measureDistance(int analogPin, KalmanFilter* kalmanFilterInstance = nullptr) {
+  int rawValue = analogRead(analogPin);
+  
+  // Lookup tábla a megadott értékpárokkal (analóg érték -> cm)
+  const int lookupSize = 11;
+  const int analogValues[lookupSize] = {2500, 1500, 880, 600, 450, 405, 370, 330, 300, 150, 100};
+  const double distances[lookupSize] = {1.0, 2.5, 5.0, 7.5, 10.0, 12.5, 15.0, 17.5, 20.0, 35.0, 45.0};
+  
+  double rawDistance = 0;
+  
+  // Ha kisebb az érték mint a legkisebb a táblában (100), akkor 45cm-nél nagyobb
+  if (rawValue < 100) {
+    rawDistance = 50.0;
+  }
+  // Ha nagyobb az érték mint a legnagyobb a táblában (2500), akkor 1cm
+  else if (rawValue > 2500) {
+    rawDistance = 1.0;
+  }
+  else {
+    // Keressük meg a két szomszédos értéket és interpoláljunk
+    for (int i = 0; i < lookupSize - 1; i++) {
+      if (rawValue <= analogValues[i] && rawValue > analogValues[i+1]) {
+        // Lineáris interpoláció
+        double proportion = (double)(rawValue - analogValues[i+1]) / (analogValues[i] - analogValues[i+1]);
+        rawDistance = distances[i] + (1.0 - proportion) * (distances[i+1] - distances[i]);
+        break;
+      }
+    }
+    
+    // Fallback, ha nem találtunk megfelelő értéket
+    if (rawDistance == 0) {
+      rawDistance = 15.0;
+    }
+  }
+  
+  // Ha van megadva Kalman-szűrő, alkalmazzuk
+  if (kalmanFilterInstance != nullptr) {
+    return kalmanFilter(rawDistance, kalmanFilterInstance);
+  }
+  
+  return rawDistance;
+}
+
+// Előre néző távolságmérő függvény Kalman-szűrővel
+double measureFrontDistance(int analogPin, KalmanFilter* kalmanFilterInstance = nullptr) {
+  int rawValue = analogRead(analogPin);
+  
+  // Lookup tábla a megadott értékpárokkal (analóg érték -> cm)
+  const int lookupSize = 8;
+  const int analogValues[lookupSize] = {2000, 1200, 750, 500, 375, 300, 200, 150};
+  const double distances[lookupSize] = {5, 10, 15, 20, 25, 30, 35, 40};
+  
+  double rawDistance = 0;
+  
+  // Ha kisebb az érték mint a legkisebb a táblában (150), akkor 70cm
+  if (rawValue < 150) {
+    rawDistance = 70.0;
+  }
+  // Ha nagyobb az érték mint a legnagyobb a táblában (2000), akkor 5cm
+  else if (rawValue > 2000) {
+    rawDistance = 5.0;
+  }
+  else {
+    // Keressük meg a két szomszédos értéket és interpoláljunk
+    for (int i = 0; i < lookupSize - 1; i++) {
+      if (rawValue <= analogValues[i] && rawValue > analogValues[i+1]) {
+        // Lineáris interpoláció
+        double proportion = (double)(rawValue - analogValues[i+1]) / (analogValues[i] - analogValues[i+1]);
+        rawDistance = distances[i+1] + proportion * (distances[i] - distances[i+1]);
+        break;
+      }
+    }
+    
+    // Fallback, ha nem találtunk megfelelő értéket
+    if (rawDistance == 0) {
+      rawDistance = 60000.0 * pow(rawValue, -1.05) + 3.0;
+    }
+  }
+  
+  // Ha van megadva Kalman-szűrő, alkalmazzuk
+  if (kalmanFilterInstance != nullptr) {
+    return kalmanFilter(rawDistance, kalmanFilterInstance);
+  }
+  
+  return rawDistance;
 }
 
 // Előre haladás
@@ -415,46 +510,12 @@ void PidDrive(double distanceFromMiddle, int maxSpeed, bool isThereAWall)
   }
 }
 
-double measureFrontDistanceWithFilter(int trigerpin)
-{
-  unsigned int numberOfMeasurements = 4;
-  double treshold = 10;
-  unsigned int NumberOfMatchesNeeded = 3;
-  double frontdistances[numberOfMeasurements];
-  for (size_t i = 0; i < numberOfMeasurements; i++)
-  {
-    frontdistances[i] = measureDistance(trigerpin);
-    delay(10);
-  }
-  for (size_t i = 0; i < numberOfMeasurements; i++)
-  {
-    int matched = 0;
-    for (size_t j = 0; j < numberOfMeasurements; j++)
-    {
-      if (abs(frontdistances[i] - frontdistances[j]) < treshold)
-        matched++;
-    }
-    if (matched - 1 > NumberOfMatchesNeeded)
-      return frontdistances[i];
-  }
-  double sum, avg;
-  sum = 0;
-  avg = 0;
-
-  for (int i = 0; i < numberOfMeasurements; i++)
-  {
-    sum += frontdistances[i];
-  }
-  avg = sum / numberOfMeasurements;
-  return avg;
-}
 
 // feltölt egy double tömböt távolságokkal - előre, balra és jobbra mér
-void measureDistanceAllDirections()
-{
-  distances[DIRECTION_FRONT] = measureDistance(IR_PIN_FRONT) * 6;
-  distances[DIRECTION_RIGHT] = measureDistance(IR_PIN_RIGHT) * 4;
-  distances[DIRECTION_LEFT] = measureDistance(IR_PIN_LEFT) * 4;
+void measureDistanceAllDirections() {
+  distances[DIRECTION_FRONT] = measureFrontDistance(IR_PIN_FRONT, &frontKalman);
+  distances[DIRECTION_RIGHT] = measureDistance(IR_PIN_RIGHT, &rightKalman);
+  distances[DIRECTION_LEFT] = measureDistance(IR_PIN_LEFT, &leftKalman);
 }
 
 // összetett függvény ami a körülötte lévő falak számától függően középre rendezi a robotot miközben előrefele halad.
@@ -466,7 +527,7 @@ void forwardWithAlignment(int maxSpeed)
   {
 
     // Számold ki a középső távolságot a jobb és bal oldali távolságok alapján
-    double distanceFromMiddle = (distances[DIRECTION_RIGHT] - distances[DIRECTION_LEFT]) / 2.0;
+    double distanceFromMiddle = (distances[DIRECTION_RIGHT] - distances[DIRECTION_LEFT]);
 
     PidDrive(distanceFromMiddle, maxSpeed, true);
   }
@@ -475,7 +536,7 @@ void forwardWithAlignment(int maxSpeed)
   {
 
     // Számold ki a középső távolságot a jobb és bal oldali távolságok alapján
-    double distanceFromMiddle = (distanceFromSingleWall - distances[DIRECTION_LEFT]) / 2.0;
+    double distanceFromMiddle = (distanceFromSingleWall - distances[DIRECTION_LEFT]);
 
     PidDrive(distanceFromMiddle, maxSpeed, true);
   }
@@ -484,7 +545,7 @@ void forwardWithAlignment(int maxSpeed)
   {
 
     // Számold ki a középső távolságot a jobb és bal oldali távolságok alapján
-    double distanceFromMiddle = (distances[DIRECTION_RIGHT] - distanceFromSingleWall) / 2.0;
+    double distanceFromMiddle = (distances[DIRECTION_RIGHT] - distanceFromSingleWall);
 
     PidDrive(distanceFromMiddle, maxSpeed, true);
   }
@@ -579,6 +640,19 @@ int rfidToDirection(int *dirs = nullptr)
     }
   }
   return -2;
+}
+
+double kalmanFilter(double measurement, KalmanFilter* filter) {
+  // Előrejelzési lépés
+  double predictedEstimate = filter->estimate;
+  double predictedErrorCovariance = filter->errorCovariance + filter->processNoise;
+  
+  // Frissítési lépés
+  double kalmanGain = predictedErrorCovariance / (predictedErrorCovariance + filter->measurementNoise);
+  filter->estimate = predictedEstimate + kalmanGain * (measurement - predictedEstimate);
+  filter->errorCovariance = (1 - kalmanGain) * predictedErrorCovariance;
+  
+  return filter->estimate;
 }
 
 void orientRobot(double desiredAngle)

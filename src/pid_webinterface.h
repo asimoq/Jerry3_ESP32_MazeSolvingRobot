@@ -9,6 +9,8 @@ extern double Pid_P;
 extern double Pid_I;
 extern double Pid_D;
 extern double distanceFromSingleWall;
+extern double distances[3];
+extern double forwardMaxSpeed;
 extern WebServer server;
 extern void beep(int number);
 
