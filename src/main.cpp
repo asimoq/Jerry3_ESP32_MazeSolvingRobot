@@ -6,7 +6,6 @@
 #include <MFRC522DriverSPI.h>
 #include <MFRC522DriverPinSimple.h>
 #include <MFRC522Debug.h>
-
 #include <string.h>
 #include <stdio.h>
 #include "Wire.h"
@@ -55,8 +54,7 @@ WebServer server(80);
 // A három változó, amit a felhasználó módosíthat
 
 #define BUZZER_PIN 12
-
-const int buttonPin = 2; // A gomb a GPIO2-höz van csatlakoztatva
+#define BUTTON_PIN 2 // A gomb a GPIO2-höz van csatlakoztatva
 bool webButtonPressed = false;
 
 double distances[3];
@@ -72,13 +70,13 @@ int currentCommand;
 #define ENA 26
 
 // motor speedek
-int turnMaxSpeed = 190;
-int turnMinSpeed = 110;
-int turnProportionalSpeed = turnMaxSpeed - turnMinSpeed;
-
 double forwardMaxSpeed = 180;
-int forwardMinSpeed = 110;
+int forwardMinSpeed = 120;
 int forwardProportionalSpeed = forwardMaxSpeed - forwardMinSpeed;
+
+int turnMaxSpeed = 180;
+int turnMinSpeed = 120;
+int turnProportionalSpeed = turnMaxSpeed - turnMinSpeed;
 
 // PID változók   //100 hoz egsz okes: 0.3 0.3 0.9  //60hoz:
 int pidmode = 2;
@@ -153,7 +151,7 @@ void setup()
   pinMode(IN4, OUTPUT);
   pinMode(ENB, OUTPUT);
 
-  pinMode(buttonPin, OUTPUT); // Gomb bemenetének beállítása
+  pinMode(BUTTON_PIN, OUTPUT); // Gomb bemenetének beállítása
 
   // RFID kártyaolvasó inicializálása
 
@@ -176,7 +174,7 @@ void setup()
   delay(1000);
   beep(3);
   // várunk a gomb megnyomására
-  while (digitalRead(buttonPin) == LOW)
+  while (digitalRead(BUTTON_PIN) == LOW)
   {
     delay(100);
   }
@@ -266,13 +264,13 @@ void startupTone()
 
 void checkButton()
 {
-  if (digitalRead(buttonPin) == HIGH || webButtonPressed)
+  if (digitalRead(BUTTON_PIN) == HIGH || webButtonPressed)
   {
     webButtonPressed = false;
     stop();
     beep(3);
     delay(500);
-    while (digitalRead(buttonPin) == LOW && !webButtonPressed)
+    while (digitalRead(BUTTON_PIN) == LOW && !webButtonPressed)
     {
       delay(100);
       handlePidSettings();
