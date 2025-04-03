@@ -13,6 +13,7 @@
 #include <PID_v1.h>
 #include <math.h>
 
+
 #define DIRECTION_FRONT 0    // 0-egyenesen
 #define DIRECTION_LEFT 1     // 1-balra
 #define DIRECTION_RIGHT 2    // 2-jobbra
@@ -62,7 +63,7 @@ int turnMaxSpeed = 190;
 int turnMinSpeed = 110;
 int turnProportionalSpeed = turnMaxSpeed - turnMinSpeed;
 
-int forwardMaxSpeed = 180;
+double forwardMaxSpeed = 180;
 int forwardMinSpeed = 110;
 int forwardProportionalSpeed = forwardMaxSpeed - forwardMinSpeed;
 
@@ -179,7 +180,7 @@ void loop()
   measureDistanceAllDirections();
   handlePidSettings();
   pid.SetTunings(Pid_P, Pid_I, Pid_D);
-  while (distances[DIRECTION_FRONT] > 10)
+  while (distances[DIRECTION_FRONT] > 7)
   {
     measureDistanceAllDirections();
     handlePidSettings();
@@ -213,11 +214,14 @@ void loop()
   if (distances[DIRECTION_LEFT] >= distances[DIRECTION_RIGHT])
   {
     turnLeft(85);
+    measureDistanceAllDirections();
   }
   else
   {
     turnRight(85);
+    measureDistanceAllDirections();
   }
+
 }
 
 void handlePidSettings(){
