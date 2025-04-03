@@ -51,12 +51,34 @@ String generateHtml()
       button { background-color: #4CAF50; color: white; padding: 10px 15px; border: none; cursor: pointer; }
       .current-value { color: #666; margin-bottom: 5px; }
       .success { color: green; margin: 10px 0; }
+      .web-button { 
+        background-color: #ff5722; 
+        color: white; 
+        padding: 15px 20px; 
+        font-size: 18px; 
+        margin-bottom: 20px;
+        width: 100%;
+        border-radius: 5px;
+      }
+      .distances {
+        display: flex;
+        justify-content: space-between;
+        margin: 20px 0;
+      }
+      .distance-box {
+        padding: 10px;
+        background-color: #f1f1f1;
+        border-radius: 5px;
+        width: 30%;
+        text-align: center;
+      }
   </style>
 </head>
 <body>
   <div class="container">
       <h1>ESP32 Változó Beállító</h1>
       %SUCCESS_MESSAGE%
+      <button onclick="pressButton()" class="web-button">VIRTUÁLIS GOMB</button>
       <div id="distances">
       <h2>Távolságok</h2>
       <p>Elöl: <span id="distance-front"></span> cm</p>
@@ -88,6 +110,16 @@ String generateHtml()
   </div>
 </body>
 <script>
+ function pressButton() {
+        fetch('/button')
+          .then(response => {
+            if(response.ok) {
+              alert('Gomb aktiválva!');
+            }
+          })
+          .catch(error => console.error('Hiba:', error));
+      }
+
 function updateDistances() {
   fetch('/distances')
     .then(response => response.json())
@@ -97,6 +129,7 @@ function updateDistances() {
       document.getElementById('distance-right').textContent = data.right;
     });
 }
+    
 
 setInterval(updateDistances, 100); // Frissítés másodpercenként
 </script>
@@ -193,6 +226,11 @@ void handleDistances() {
   server.send(200, "application/json", json);
 }
 
+void handleButton() {
+  webButtonPressed = true;
+  server.send(200, "text/plain", "Gomb aktiválva");
+}
+
 void setupPidWebInterface(const char *ssid, const char *password)
 {
   // Csatlakozás a WiFi hálózathoz
@@ -217,6 +255,7 @@ void setupPidWebInterface(const char *ssid, const char *password)
   server.on("/", HTTP_GET, handleRoot);
   server.on("/update", HTTP_POST, handleUpdate);
   server.on("/distances", HTTP_GET, handleDistances);
+  server.on("/button", HTTP_GET, handleButton);
 
   // Webszerver indítása
   server.begin();
@@ -227,7 +266,7 @@ void setupPidWebInterface(const char *ssid, const char *password)
   addWebVariable("pid_d", "D (Derivative)", "Differenciáló tag", &Pid_D, 0, 200);
   addWebVariable("single_wall", "Faltól tartott távolság", "Távolság(cm)", &distanceFromSingleWall, 0, 50);
   addWebVariable("forward_max_speed", "Maximális sebesség", "Sebesség(0-255)", &forwardMaxSpeed, 0, 255);
-  addWebVariable("")
+  addWebVariable("distanceFromFrontWall", "Előre tartott távolság", "Távolság(cm)", &distanceFromFrontWall, 0, 50);
 }
 
 void handlePidWebClient()

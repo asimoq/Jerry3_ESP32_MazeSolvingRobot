@@ -57,6 +57,7 @@ WebServer server(80);
 #define BUZZER_PIN 12
 
 const int buttonPin = 2; // A gomb a GPIO2-höz van csatlakoztatva
+bool webButtonPressed = false; 
 
 double distances[3];
 int commands[256];
@@ -267,19 +268,21 @@ void startupTone()
 
 void checkButton()
 {
-  if (digitalRead(buttonPin) == HIGH)
+  if (digitalRead(buttonPin) == HIGH || webButtonPressed)
   {
+    webButtonPressed = false;
     stop();
     beep(3);
     delay(500);
-    while (digitalRead(buttonPin) == LOW)
+    while (digitalRead(buttonPin) == LOW && !webButtonPressed)
     {
       delay(100);
       handlePidSettings();
       measureDistanceAllDirections();
     }
     {
-      beep(3);
+      webButtonPressed = false;
+      beep(2);
       delay(500);
     }
   }
@@ -439,6 +442,7 @@ void turnLeft(double desiredangle)
   mpu.update();                       // gyro frissítése
   float startAngle = mpu.getAngleZ(); // gyro mérése és aktuális állapot mentése
   float currentAngle = mpu.getAngleZ();
+  float howFareAreWeFromDestinacion = 0;
 
   drive(-90, 90); // fordulás megkezdése
 
@@ -464,6 +468,7 @@ void turnRight(double desiredangle)
   mpu.update();
   float startAngle = mpu.getAngleZ(); // gyro mérése és aktuális állapot mentése
   float currentAngle = mpu.getAngleZ();
+  float howFareAreWeFromDestinacion = 0;
 
   drive(90, -90);
   while (currentAngle >= startAngle - desiredangle * 2)

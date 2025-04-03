@@ -11,6 +11,8 @@ extern double Pid_D;
 extern double distanceFromSingleWall;
 extern double distances[3];
 extern double forwardMaxSpeed;
+extern double distanceFromFrontWall;
+extern bool webButtonPressed;
 extern WebServer server;
 extern void beep(int number);
 
@@ -19,6 +21,8 @@ void setupPidWebInterface(const char* ssid, const char* password);
 void handleRoot();
 void handleUpdate();
 void handlePidWebClient();
+void handleButton();
+void handleDistances();
 
 // Sikeres frissítés jelzése
 extern bool pidValuesUpdated;
