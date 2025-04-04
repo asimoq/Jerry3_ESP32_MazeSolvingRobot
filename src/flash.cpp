@@ -9,9 +9,9 @@ uint8_t init_flash(double *P, double *I, double *D)
 
     if (modeSelected >= 0 && modeSelected < 3)
     {
-        P = EEPROM.readDouble(1+modeSelected*SPEED_BLOCK_SIZE + SPEED_MODE_P_ADDRESS);
-        I = EEPROM.readDouble(1+modeSelected*SPEED_BLOCK_SIZE + SPEED_MODE_I_ADDRESS);
-        D = EEPROM.readDouble(1+modeSelected*SPEED_BLOCK_SIZE + SPEED_MODE_D_ADDRESS);
+        *P = EEPROM.readDouble(1+modeSelected*SPEED_BLOCK_SIZE + SPEED_MODE_P_ADDRESS);
+        *I = EEPROM.readDouble(1+modeSelected*SPEED_BLOCK_SIZE + SPEED_MODE_I_ADDRESS);
+        *D = EEPROM.readDouble(1+modeSelected*SPEED_BLOCK_SIZE + SPEED_MODE_D_ADDRESS);
     }
     else
     {

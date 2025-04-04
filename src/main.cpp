@@ -11,6 +11,7 @@
 #include "Wire.h"
 #include <PID_v1.h>
 #include <math.h>
+#include "flash.h"
 
 #define DIRECTION_FRONT 0    // 0-egyenesen
 #define DIRECTION_LEFT 1     // 1-balra
@@ -171,6 +172,9 @@ void setup()
   commands[0] = 0;
   currentCommand = 0;
 
+  flash_saveSpeedMode(0);
+  flash_init(&Pid_P, &Pid_I, &Pid_D);
+
   delay(1000);
   beep(3);
   // várunk a gomb megnyomására
@@ -194,7 +198,7 @@ void loop()
   {
     measureDistanceAllDirections();
     handlePidSettings();
-    forwardWithAlignment(forwardMaxSpeed);
+    /*forwardWithAlignment(forwardMaxSpeed);
     mpu.update();
     switch (rfidToDirection(commands))
     {
@@ -230,7 +234,7 @@ void loop()
   {
     turnRight(85);
     measureDistanceAllDirections();
-  }
+  }*/
 }
 
 void handlePidSettings()
