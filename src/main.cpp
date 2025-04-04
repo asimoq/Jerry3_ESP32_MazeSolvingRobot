@@ -172,8 +172,8 @@ void setup()
   commands[0] = 0;
   currentCommand = 0;
 
-  flash_init(&Pid_P, &Pid_I, &Pid_D);
-  flash_savePID(5, 6, 7);
+  //flash_init(&Pid_P, &Pid_I, &Pid_D);
+  //flash_savePID(5, 6, 7);
 
   Serial.print(Pid_P);
   Serial.print(" ");
