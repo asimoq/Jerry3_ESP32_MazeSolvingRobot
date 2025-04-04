@@ -1,0 +1,23 @@
+#ifndef FLASH_H
+#define FLASH_H
+
+#include <EEPROM.h>
+
+#define SPEED_MEM_SIZE 24 //byte
+#define SPEED_BLOCK_SIZE 8 //byte
+
+#define SPEED_MODE_0 0
+#define SPEED_MODE_1 1
+#define SPEED_MODE_2 2
+
+#define SPEED_MODE_ADDRESS 0
+
+#define SPEED_MODE_P_ADDRESS (0 * SPEED_BLOCK_SIZE)
+#define SPEED_MODE_I_ADDRESS (1 * SPEED_BLOCK_SIZE)
+#define SPEED_MODE_D_ADDRESS (2 * SPEED_BLOCK_SIZE)
+
+uint8_t flash_init(double *, double *, double *);
+void flash_savePID(double, double, double);
+void flash_saveSpeedMode(uint8_t);
+
+#endif
