@@ -2,15 +2,14 @@
 #include <Arduino.h>
 #include <MPU6050_light.h> //gyro könyvtár
 #include <SPI.h>
-#include <MFRC522v2.h> // RFID könyvtár
-#include <MFRC522DriverSPI.h>
-#include <MFRC522DriverPinSimple.h>
-#include <MFRC522Debug.h>
+#include <MFRC522.h> // RFID könyvtár
 #include <string.h>
 #include <stdio.h>
 #include "Wire.h"
 #include <PID_v1.h>
 #include <math.h>
+
+#include <EEPROM.h>
 
 #define DIRECTION_FRONT 0    // 0-egyenesen
 #define DIRECTION_LEFT 1     // 1-balra
@@ -42,10 +41,10 @@ KalmanFilter leftKalman = {0, 1.0, 0.01, 0.1};  // Bal oldali szenzor
 KalmanFilter rightKalman = {0, 1.0, 0.01, 0.1}; // Jobb oldali szenzor
 
 double distanceFromSingleWall = 10; // hány cm-re van a fal ha csak egyhez igazodik 11.5
-double distanceFromSingleWallTreshold = distanceFromSingleWall;
+double distanceFromSingleWallTreshold = distanceFromSingleWall / 2;
 double distanceFromFrontWall = 10; // mennyire van messze az elötte lévő fal
 
-const char *ssid = "Bende_iphone";
+const char *ssid = "Jerry0_3";
 const char *password = "Pass1234$";
 
 // Webszerver létrehozása a 80-as porton
@@ -89,9 +88,8 @@ PID pid(&input, &output, &setpoint, Pid_P, Pid_I, Pid_D, DIRECT);
 // RFID CONFIG
 #define RST_PIN 13
 #define SS_PIN 5
-MFRC522DriverPinSimple ss_pin(SS_PIN);
-MFRC522DriverSPI driver{ss_pin};
-MFRC522 mfrc522{driver};
+MFRC522 mfrc522(SS_PIN, RST_PIN);
+MFRC522::MIFARE_Key key;
 
 void beep(int number);
 void startupTone();
@@ -116,7 +114,7 @@ double kalmanFilter(double measurement, KalmanFilter *filter);
 
 void setup()
 {
-  delay(1000);
+  delay(100);
   pinMode(BUZZER_PIN, OUTPUT);
 
   // Soros kommunikáció inicializálása
@@ -139,7 +137,7 @@ void setup()
   } // stop everything if could not connect to MPU6050
 
   Serial.println(F("Calculating offsets, do not move MPU6050"));
-  delay(1000);
+  delay(100);
   mpu.calcOffsets(); // gyro and accelero
   Serial.println("Done!\n");
 
@@ -157,9 +155,8 @@ void setup()
 
   SPI.begin();
   mfrc522.PCD_Init();
-  MFRC522Debug::PCD_DumpVersionToSerial(mfrc522, Serial);
-  mfrc522.PCD_AntennaOn();
-  mfrc522.PCD_SetAntennaGain(0x07); // 0x07 = 48dB
+  mfrc522.PCD_DumpVersionToSerial(); // 0x07 = 48dB
+  mfrc522.PCD_SetAntennaGain(mfrc522.RxGain_max);
 
   pid.SetMode(AUTOMATIC);
   pid.SetOutputLimits(-255, 255);
@@ -171,12 +168,13 @@ void setup()
   commands[0] = 0;
   currentCommand = 0;
 
-  delay(1000);
+  delay(100);
   beep(3);
   // várunk a gomb megnyomására
   while (digitalRead(BUTTON_PIN) == LOW)
   {
-    delay(100);
+    measureDistanceAllDirections();
+    handlePidSettings();
   }
   {
     beep(3);
@@ -224,12 +222,18 @@ void loop()
   if (distances[DIRECTION_LEFT] >= distances[DIRECTION_RIGHT])
   {
     turnLeft(85);
-    measureDistanceAllDirections();
+    for (size_t i = 0; i < 10; i++)
+    {
+      measureDistanceAllDirections();
+    }
   }
   else
   {
     turnRight(85);
-    measureDistanceAllDirections();
+    for (size_t i = 0; i < 10; i++)
+    {
+      measureDistanceAllDirections();
+    }
   }
 }
 
@@ -458,9 +462,10 @@ void turnLeft(double desiredangle)
 
   drive(-90, 90); // fordulás megkezdése
 
-  while (currentAngle <= startAngle + desiredangle * 2)
+  while (currentAngle <= startAngle + desiredangle)
   {               // várakozás amíg el nem értük a kívánt fokot. lehet több vagy kevesebb a kívánt fok.
     mpu.update(); // gyro frissítés
+    measureDistanceAllDirections();
     currentAngle = mpu.getAngleZ();
     howFareAreWeFromDestinacion = ((startAngle + desiredangle) - currentAngle) / desiredangle;
     drive(-constrain((turnMinSpeed + (turnProportionalSpeed * howFareAreWeFromDestinacion)), turnMinSpeed, turnMaxSpeed), constrain((turnMinSpeed + (turnProportionalSpeed * howFareAreWeFromDestinacion)), turnMinSpeed, turnMaxSpeed));
@@ -483,9 +488,10 @@ void turnRight(double desiredangle)
   float howFareAreWeFromDestinacion = 0;
 
   drive(90, -90);
-  while (currentAngle >= startAngle - desiredangle * 2)
+  while (currentAngle >= startAngle - desiredangle)
   {               // lehet több vagy kevesebb a kívánt fok
     mpu.update(); // gyro frissítés
+    measureDistanceAllDirections();
     currentAngle = mpu.getAngleZ();
     howFareAreWeFromDestinacion = (currentAngle - (startAngle - desiredangle)) / desiredangle;
     drive(constrain((turnMinSpeed + (turnProportionalSpeed * howFareAreWeFromDestinacion)), turnMinSpeed, turnMaxSpeed), -constrain((turnMinSpeed + (turnProportionalSpeed * howFareAreWeFromDestinacion)), turnMinSpeed, turnMaxSpeed));
@@ -553,7 +559,7 @@ void forwardWithAlignment(int maxSpeed)
   {
 
     // Számold ki a középső távolságot a jobb és bal oldali távolságok alapján
-    double distanceFromMiddle = (distanceFromSingleWall - distances[DIRECTION_LEFT])*2;
+    double distanceFromMiddle = (distanceFromSingleWall - distances[DIRECTION_LEFT]) * 2;
 
     PidDrive(distanceFromMiddle, maxSpeed, true);
   }
@@ -562,7 +568,7 @@ void forwardWithAlignment(int maxSpeed)
   {
 
     // Számold ki a középső távolságot a jobb és bal oldali távolságok alapján
-    double distanceFromMiddle = (distances[DIRECTION_RIGHT] - distanceFromSingleWall)*2;
+    double distanceFromMiddle = (distances[DIRECTION_RIGHT] - distanceFromSingleWall) * 2;
 
     PidDrive(distanceFromMiddle, maxSpeed, true);
   }
@@ -579,85 +585,88 @@ void forwardWithAlignment(int maxSpeed)
 //  dirs pointer opcionális az első fordulóban.
 int rfidToDirection(int *dirs = nullptr)
 {
-  delay(50);
   int retVal[4] = {0};
   if (dirs == nullptr)
   {
     dirs = retVal;
   }
 
-  if (mfrc522.PICC_IsNewCardPresent())
+  if (!mfrc522.PICC_IsNewCardPresent())
   {
-    beep(1);
-    if (mfrc522.PICC_ReadCardSerial())
+    return -1;
+  }
+
+  // Select one of the cards
+  if (!mfrc522.PICC_ReadCardSerial())
+  {
+    return -1;
+  }
+  beep(1);
+  if ((mfrc522.uid.uidByte[1] == 0xBC))
+  {
+    switch (mfrc522.uid.uidByte[2] & 0xF0)
     {
-      if ((mfrc522.uid.uidByte[1] == 0xBC))
-      {
-        switch (mfrc522.uid.uidByte[2] & 0xF0)
-        {
-        case 0xC0:
-          /* START */
-          dirs[0] = DIRECTION_START;
-          break;
-        case 0x50:
-          /* STOP */
-          dirs[0] = DIRECTION_STOP;
-          break;
-        case 0xF0:
-          /* JOBBRA */
-          dirs[0] = DIRECTION_RIGHT;
-          break;
-        case 0x00:
-          /* BALRA */
-          dirs[0] = DIRECTION_LEFT;
-          break;
-        case 0x90:
-        case 0xA0:
-          /* EJJB */
-          dirs[0] = DIRECTION_FRONT;
-          dirs[1] = DIRECTION_RIGHT;
-          dirs[2] = DIRECTION_RIGHT;
-          dirs[3] = DIRECTION_LEFT;
-        default:
-          /* bro baj van */
-          dirs[0] = -1;
-          break;
-        }
-      }
-      else if (mfrc522.uid.uidByte[1] == 0xBD)
-      {
-        switch (mfrc522.uid.uidByte[2] & 0xF0)
-        {
-        case 0xD0:
-        case 0xE0:
-        case 0xF0:
-          /* ZSÁK UTCA */
-          dirs[0] = DIRECTION_DEAD_END;
-          break;
-        case 0x00:
-          /* BJJ */
-          dirs[0] = DIRECTION_LEFT;
-          dirs[1] = DIRECTION_RIGHT;
-          dirs[2] = DIRECTION_RIGHT;
-          break;
-        case 0x60:
-          /* JBB */
-          dirs[0] = DIRECTION_RIGHT;
-          dirs[1] = DIRECTION_LEFT;
-          dirs[2] = DIRECTION_LEFT;
-          break;
-        default:
-          /* BRO BAJ VAN */
-          dirs[0] = -1;
-          break;
-        }
-      }
-      mfrc522.PICC_HaltA();
-      return dirs[0];
+    case 0xC0:
+      /* START */
+      dirs[0] = DIRECTION_START;
+      break;
+    case 0x50:
+      /* STOP */
+      dirs[0] = DIRECTION_STOP;
+      break;
+    case 0xF0:
+      /* JOBBRA */
+      dirs[0] = DIRECTION_RIGHT;
+      break;
+    case 0x00:
+      /* BALRA */
+      dirs[0] = DIRECTION_LEFT;
+      break;
+    case 0x90:
+    case 0xA0:
+      /* EJJB */
+      dirs[0] = DIRECTION_FRONT;
+      dirs[1] = DIRECTION_RIGHT;
+      dirs[2] = DIRECTION_RIGHT;
+      dirs[3] = DIRECTION_LEFT;
+    default:
+      /* bro baj van */
+      dirs[0] = -1;
+      break;
     }
   }
-  return -2;
+  else if (mfrc522.uid.uidByte[1] == 0xBD)
+  {
+    switch (mfrc522.uid.uidByte[2] & 0xF0)
+    {
+    case 0xD0:
+    case 0xE0:
+    case 0xF0:
+      /* ZSÁK UTCA */
+      dirs[0] = DIRECTION_DEAD_END;
+      break;
+    case 0x00:
+      /* BJJ */
+      dirs[0] = DIRECTION_LEFT;
+      dirs[1] = DIRECTION_RIGHT;
+      dirs[2] = DIRECTION_RIGHT;
+      break;
+    case 0x60:
+      /* JBB */
+      dirs[0] = DIRECTION_RIGHT;
+      dirs[1] = DIRECTION_LEFT;
+      dirs[2] = DIRECTION_LEFT;
+      break;
+    default:
+      /* BRO BAJ VAN */
+      dirs[0] = -1;
+      break;
+    }
+  }
+  mfrc522.PICC_HaltA();
+  return dirs[0];
 }
+
 
 double kalmanFilter(double measurement, KalmanFilter *filter)
 {
