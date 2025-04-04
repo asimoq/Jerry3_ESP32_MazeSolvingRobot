@@ -52,7 +52,7 @@ String generateHtml()
       .current-value { color: #666; margin-bottom: 5px; }
       .success { color: green; margin: 10px 0; }
       .web-button { 
-        background-color: #ff5722; 
+        background-color:rgb(255, 222, 34); 
         color: white; 
         padding: 15px 20px; 
         font-size: 18px; 
@@ -103,9 +103,14 @@ String generateHtml()
             "\" max=\"" + String(var.maxValue) + "\">";
     html += "</div>";
   }
-
+  html += "<div style='margin-top: 15px;'>";
+  html += "<button type='button' onclick='saveSettings()' class='button'>Beállítások mentése</button> ";
+  html += "<button type='button' onclick='loadSettings()' class='button'>Beállítások betöltése</button>";
+  html += "</div>";
   html += R"=====(
-          <button type="submit">Értékek frissítése</button>
+          <br> 
+          <br> 
+        <button type="submit">Értékek frissítése</button>
       </form>
   </div>
 </body>
@@ -132,7 +137,37 @@ function updateDistances() {
     
 
 setInterval(updateDistances, 100); // Frissítés másodpercenként
-</script>
+
+</script>)=====";
+  // JavaScript kód a HTML-be
+  html += "<script>";
+  html += "function saveSettings() {";
+  html += "  const settings = {};";
+  // Minden változó értékének kiolvasása és mentése
+  html += "  document.querySelectorAll('input[type=\"number\"]').forEach(input => {";
+  html += "    settings[input.id] = parseFloat(input.value);";
+  html += "  });";
+  html += "  localStorage.setItem('pidSettings', JSON.stringify(settings));";
+  html += "  alert('Beállítások sikeresen elmentve!');";
+  html += "}";
+  html += "";
+  html += "function loadSettings() {";
+  html += "  const savedSettings = localStorage.getItem('pidSettings');";
+  html += "  if (savedSettings) {";
+  html += "    const settings = JSON.parse(savedSettings);";
+  html += "    for (const id in settings) {";
+  html += "      const input = document.getElementById(id);";
+  html += "      if (input) {";
+  html += "        input.value = settings[id];";
+  html += "      }";
+  html += "    }";
+  html += "    alert('Beállítások sikeresen betöltve!');";
+  html += "  } else {";
+  html += "    alert('Nincsenek mentett beállítások!');";
+  html += "  }";
+  html += "}";
+  html += "</script>";
+  html += R"=====(
 </html>
 )=====";
 
@@ -219,37 +254,60 @@ void handleUpdate()
   server.send(302, "text/plain", "");
 }
 
-void handleDistances() {
-  String json = "{\"front\":" + String(distances[DIRECTION_FRONT]) + 
-                ",\"left\":" + String(distances[DIRECTION_LEFT]) + 
+void handleDistances()
+{
+  String json = "{\"front\":" + String(distances[DIRECTION_FRONT]) +
+                ",\"left\":" + String(distances[DIRECTION_LEFT]) +
                 ",\"right\":" + String(distances[DIRECTION_RIGHT]) + "}";
   server.send(200, "application/json", json);
 }
 
-void handleButton() {
+void handleButton()
+{
   webButtonPressed = true;
   server.send(200, "text/plain", "Gomb aktiválva");
+}
+
+void onWiFiEvent(WiFiEvent_t event)
+{
+  switch (event)
+  {
+  case SYSTEM_EVENT_AP_STACONNECTED:
+    Serial.println("Egy eszköz csatlakozott az AP-hez");
+    beep(1); // Egyszeri csipogás csatlakozáskor
+    break;
+  case SYSTEM_EVENT_AP_STADISCONNECTED:
+    Serial.println("Egy eszköz lecsatlakozott az AP-ről");
+    beep(2); // Kétszeri csipogás lecsatlakozáskor
+    break;
+  default:
+    break;
+  }
 }
 
 void setupPidWebInterface(const char *ssid, const char *password)
 {
   // Csatlakozás a WiFi hálózathoz
-  Serial.print("Csatlakozas a WiFi halozathoz: ");
+  Serial.print("WiFi halozat letrehozasa: ");
   Serial.println(ssid);
 
-  WiFi.begin(ssid, password);
+  WiFi.mode(WIFI_AP);
 
-  // Várakozás a kapcsolat létrejöttére
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(500);
-    Serial.print(".");
-  }
+  IPAddress local_IP(192, 168, 4, 1);
+  IPAddress gateway(192, 168, 4, 1);
+  IPAddress subnet(255, 255, 255, 0);
+
+  // Soft AP konfigurálása fix IP címmel
+  WiFi.mode(WIFI_AP);
+  WiFi.softAPConfig(local_IP, gateway, subnet);
+  WiFi.softAP(ssid, password);
+
+  WiFi.onEvent(onWiFiEvent);
+
+  IPAddress IP = WiFi.softAPIP();
+  Serial.print("AP IP cím: ");
   beep(1);
   Serial.println("");
-  Serial.println("WiFi kapcsolat letrejott");
-  Serial.print("IP cim: ");
-  Serial.println(WiFi.localIP());
 
   // Útvonalak beállítása a webszerverhez
   server.on("/", HTTP_GET, handleRoot);
