@@ -46,8 +46,8 @@ double distanceFromSingleWall = 10; // hány cm-re van a fal ha csak egyhez igaz
 double distanceFromSingleWallTreshold = distanceFromSingleWall;
 double distanceFromFrontWall = 10; // mennyire van messze az elötte lévő fal
 
-const char *ssid = "Bende_iphone";
-const char *password = "Pass1234$";
+const char *ssid = "Hi";
+const char *password = "12345678";
 
 // Webszerver létrehozása a 80-as porton
 WebServer server(80);
@@ -131,17 +131,17 @@ void setup()
   Serial.println(WiFi.localIP());
 
   // gyro beállítása
-  Wire.begin();
-  byte status = mpu.begin();
+  //Wire.begin();
+  //byte status = mpu.begin();
   Serial.print(F("MPU6050 status: "));
-  Serial.println(status);
-  while (status != 0)
+  //Serial.println(status);
+  /*while (status != 0)
   {
-  } // stop everything if could not connect to MPU6050
+  } */// stop everything if could not connect to MPU6050
 
   Serial.println(F("Calculating offsets, do not move MPU6050"));
   delay(1000);
-  mpu.calcOffsets(); // gyro and accelero
+  //mpu.calcOffsets(); // gyro and accelero
   Serial.println("Done!\n");
 
   // Motorvezérlő pin-ek beállítása
@@ -157,7 +157,7 @@ void setup()
   // RFID kártyaolvasó inicializálása
 
   SPI.begin();
-  mfrc522.PCD_Init();
+  /*mfrc522.PCD_Init();
   MFRC522Debug::PCD_DumpVersionToSerial(mfrc522, Serial);
   mfrc522.PCD_AntennaOn();
   mfrc522.PCD_SetAntennaGain(0x07); // 0x07 = 48dB
@@ -167,13 +167,20 @@ void setup()
   pid.SetSampleTime(25);
 
   mpu.update();
-  lastCorrectAngle = mpu.getAngleZ();
+  lastCorrectAngle = mpu.getAngleZ();*/
 
   commands[0] = 0;
   currentCommand = 0;
 
-  flash_saveSpeedMode(0);
   flash_init(&Pid_P, &Pid_I, &Pid_D);
+  flash_savePID(5, 6, 7);
+
+  Serial.print(Pid_P);
+  Serial.print(" ");
+  Serial.print(Pid_I);
+  Serial.print(" ");
+  Serial.println(Pid_D);
+
 
   delay(1000);
   beep(3);
@@ -222,8 +229,9 @@ void loop()
 
     default:
       break;
-    }
+    }*/
   }
+    /*
   stop();
   if (distances[DIRECTION_LEFT] >= distances[DIRECTION_RIGHT])
   {

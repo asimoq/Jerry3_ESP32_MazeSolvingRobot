@@ -16,8 +16,8 @@
 #define SPEED_MODE_I_ADDRESS (1 * (SPEED_BLOCK_SIZE))
 #define SPEED_MODE_D_ADDRESS (2 * (SPEED_BLOCK_SIZE))
 
-uint8_t flash_init(double *, double *, double *);
-void flash_savePID(double, double, double);
-void flash_saveSpeedMode(uint8_t);
+uint8_t flash_init(double *P, double *I, double *D);
+void flash_savePID(double P, double I, double D);
+void flash_saveSpeedMode(uint8_t speedMode);
 
 #endif
