@@ -169,12 +169,20 @@ void setup()
   mpu.update();
   lastCorrectAngle = mpu.getAngleZ();*/
 
+  while (digitalRead(BUTTON_PIN) == LOW)
+  {
+    delay(100);
+  }
+
   commands[0] = 0;
   currentCommand = 0;
 
-  //flash_init(&Pid_P, &Pid_I, &Pid_D);
-  //flash_savePID(5, 6, 7);
+  flash_init();
+  flash_saveSpeedMode(0); //0-2 engedélyezett, különben átáll 0-ra.
+  flash_loadPID(&Pid_P, &Pid_I, &Pid_D);
 
+  Serial.print(flash_getModeSelected());
+  Serial.print(" ");
   Serial.print(Pid_P);
   Serial.print(" ");
   Serial.print(Pid_I);

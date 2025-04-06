@@ -21,5 +21,6 @@ void flash_savePID(double P, double I, double D);
 void flash_saveSpeedMode(uint8_t speedMode);
 void flash_loadPID(double *P, double *I, double *D);
 void flash_loadSpeedMode();
+uint8_t flash_getModeSelected();
 
 #endif
