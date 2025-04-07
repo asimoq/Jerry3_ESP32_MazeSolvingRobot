@@ -73,8 +73,8 @@ double forwardMaxSpeed = 180;
 int forwardMinSpeed = 120;
 int forwardProportionalSpeed = forwardMaxSpeed - forwardMinSpeed;
 
-int turnMaxSpeed = 180;
-int turnMinSpeed = 120;
+double turnMaxSpeed = 180;
+double turnMinSpeed = 120;
 int turnProportionalSpeed = turnMaxSpeed - turnMinSpeed;
 double delayBeforeTurn = 700; // millisec
 
@@ -492,7 +492,7 @@ void turnLeft(double desiredangle)
   float currentAngle = mpu.getAngleZ();
   float howFareAreWeFromDestinacion = 0;
 
-  drive(-90, 90); // fordulás megkezdése
+  drive(-turnMaxSpeed, turnMaxSpeed); // fordulás megkezdése
 
   while (currentAngle <= startAngle + desiredangle)
   {               // várakozás amíg el nem értük a kívánt fokot. lehet több vagy kevesebb a kívánt fok.
@@ -500,7 +500,8 @@ void turnLeft(double desiredangle)
     measureDistanceAllDirections();
     currentAngle = mpu.getAngleZ();
     howFareAreWeFromDestinacion = ((startAngle + desiredangle) - currentAngle) / desiredangle;
-    drive(-constrain((turnMinSpeed + (turnProportionalSpeed * howFareAreWeFromDestinacion)), turnMinSpeed, turnMaxSpeed), constrain((turnMinSpeed + (turnProportionalSpeed * howFareAreWeFromDestinacion)), turnMinSpeed, turnMaxSpeed));
+    howFareAreWeFromDestinacion = howFareAreWeFromDestinacion * 2;
+    drive(-constrain((turnMinSpeed + (turnProportionalSpeed * howFareAreWeFromDestinacion)), (int)turnMinSpeed, (int)turnMaxSpeed), constrain((turnMinSpeed + (turnProportionalSpeed * howFareAreWeFromDestinacion)), turnMinSpeed, turnMaxSpeed));
   }
   drive(80, -80);
   delay(60);
@@ -519,14 +520,15 @@ void turnRight(double desiredangle)
   float currentAngle = mpu.getAngleZ();
   float howFareAreWeFromDestinacion = 0;
 
-  drive(90, -90);
+  drive(turnMaxSpeed, -turnMaxSpeed);
   while (currentAngle >= startAngle - desiredangle)
   {               // lehet több vagy kevesebb a kívánt fok
     mpu.update(); // gyro frissítés
     measureDistanceAllDirections();
     currentAngle = mpu.getAngleZ();
     howFareAreWeFromDestinacion = (currentAngle - (startAngle - desiredangle)) / desiredangle;
-    drive(constrain((turnMinSpeed + (turnProportionalSpeed * howFareAreWeFromDestinacion)), turnMinSpeed, turnMaxSpeed), -constrain((turnMinSpeed + (turnProportionalSpeed * howFareAreWeFromDestinacion)), turnMinSpeed, turnMaxSpeed));
+    howFareAreWeFromDestinacion = howFareAreWeFromDestinacion * 2;
+    drive(constrain((turnMinSpeed + (turnProportionalSpeed * howFareAreWeFromDestinacion)), (int)turnMinSpeed, (int)turnMaxSpeed), -constrain((turnMinSpeed + (turnProportionalSpeed * howFareAreWeFromDestinacion)), turnMinSpeed, turnMaxSpeed));
   }
 
   drive(-80, 80);
