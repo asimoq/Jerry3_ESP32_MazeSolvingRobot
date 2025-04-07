@@ -378,6 +378,8 @@ void setupPidWebInterface(const char *ssid, const char *password)
   addWebVariable("delay_time", "Időzítés", "Idő(ms)", &delayBeforeTurn, 0, 5000);
   addWebVariable("turn_min_speed", "Minimális fordulási sebesség", "Sebesség(0-255)", &turnMinSpeed, 0, 255);
   addWebVariable("turn_max_speed", "Maximális fordulási sebesség", "Sebesség(0-255)", &turnMaxSpeed, 0, 255);
+  addWebVariable("motor_max_speed", "Maximális motor sebesség", "Sebesség(0-255)", &motorMaxSpeed, 0, 300);
+  addWebVariable("motor_min_speed", "Minimális motor sebesség", "Sebesség(0-255)", &motorMinSpeed, -300, 300);
 
   // EEPROM inicializálása
   if (!EEPROM.begin(EEPROM_SIZE))

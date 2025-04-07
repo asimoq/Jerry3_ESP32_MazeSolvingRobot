@@ -15,6 +15,8 @@ extern double distanceFromFrontWall;
 extern double delayBeforeTurn;
 extern double turnMinSpeed;
 extern double turnMaxSpeed;
+extern double motorMaxSpeed;
+extern double motorMinSpeed;
 extern bool webButtonPressed;
 extern WebServer server;
 extern void beep(int number);

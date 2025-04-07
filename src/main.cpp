@@ -8,7 +8,6 @@
 #include "Wire.h"
 #include <PID_v1.h>
 #include <math.h>
-
 #include <EEPROM.h>
 
 #define DIRECTION_FRONT 0    // 0-egyenesen
@@ -69,6 +68,8 @@ int currentCommand;
 #define ENA 26
 
 // motor speedek
+double motorMaxSpeed = 255;
+double motorMinSpeed = -50;
 double forwardMaxSpeed = 180;
 int forwardMinSpeed = 120;
 int forwardProportionalSpeed = forwardMaxSpeed - forwardMinSpeed;
@@ -93,7 +94,9 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);
 MFRC522::MIFARE_Key key;
 
 void beep(int number);
+void beepWithForwardWithAlighnment(int number);
 void startupTone();
+void finishTone();
 void checkButton();
 void drive(int motorSpeedLeft, int motorSpeedRight);
 double measureDistance(int analogPin);
@@ -207,12 +210,17 @@ void loop()
       break;
     case DIRECTION_STOP:
       stop();
-      drive(150, -150);
+      
+      finishTone();
+      drive(250, -250);
       delay(2000);
-      while (true)
+      stop();
+      while (digitalRead(BUTTON_PIN) == LOW)
       {
-        stop();
+        delay(100);
       }
+      SPI.begin();
+      mfrc522.PCD_Init();
       break;
 
     default:
@@ -279,6 +287,125 @@ void beepWithForwardWithAlighnment(int number)
     noTone(BUZZER_PIN);
     delayWithForwardWithAlignment((100 / number), forwardMaxSpeed); // 0.1 másodpercig töredékéig csönd amekkora szám annyi részre osztja
   }
+}
+
+void finishTone()
+{
+
+  // Fanfár kezdés
+  tone(BUZZER_PIN, 523);
+  delay(150);
+  noTone(BUZZER_PIN);
+  delay(30); // C5
+  tone(BUZZER_PIN, 659);
+  delay(150);
+  noTone(BUZZER_PIN);
+  delay(30); // E5
+  tone(BUZZER_PIN, 784);
+  delay(300);
+  noTone(BUZZER_PIN);
+  delay(50); // G5
+
+  // Győzelmi motívum
+  tone(BUZZER_PIN, 784);
+  delay(200);
+  noTone(BUZZER_PIN);
+  delay(30); // G5
+  tone(BUZZER_PIN, 784);
+  delay(200);
+  noTone(BUZZER_PIN);
+  delay(30); // G5
+  tone(BUZZER_PIN, 880);
+  delay(400);
+  noTone(BUZZER_PIN);
+  delay(50); // A5
+
+  // Vidám futam
+  tone(BUZZER_PIN, 784);
+  delay(150);
+  noTone(BUZZER_PIN);
+  delay(30); // G5
+  tone(BUZZER_PIN, 698);
+  delay(150);
+  noTone(BUZZER_PIN);
+  delay(30); // F5
+  tone(BUZZER_PIN, 659);
+  delay(150);
+  noTone(BUZZER_PIN);
+  delay(30); // E5
+  tone(BUZZER_PIN, 587);
+  delay(150);
+  noTone(BUZZER_PIN);
+  delay(30); // D5
+  tone(BUZZER_PIN, 523);
+  delay(150);
+  noTone(BUZZER_PIN);
+  delay(30); // C5
+  tone(BUZZER_PIN, 587);
+  delay(150);
+  noTone(BUZZER_PIN);
+  delay(30); // D5
+  tone(BUZZER_PIN, 659);
+  delay(150);
+  noTone(BUZZER_PIN);
+  delay(30); // E5
+
+  // Trilla
+  tone(BUZZER_PIN, 784);
+  delay(100);
+  noTone(BUZZER_PIN);
+  delay(20); // G5
+  tone(BUZZER_PIN, 880);
+  delay(100);
+  noTone(BUZZER_PIN);
+  delay(20); // A5
+  tone(BUZZER_PIN, 784);
+  delay(100);
+  noTone(BUZZER_PIN);
+  delay(20); // G5
+  tone(BUZZER_PIN, 880);
+  delay(100);
+  noTone(BUZZER_PIN);
+  delay(20); // A5
+
+  // Záró akkord
+  tone(BUZZER_PIN, 523);
+  delay(50); // C5
+  tone(BUZZER_PIN, 659);
+  delay(50); // E5
+  tone(BUZZER_PIN, 784);
+  delay(50); // G5
+  tone(BUZZER_PIN, 1047);
+  delay(600);
+  noTone(BUZZER_PIN); // C6
+
+  // Rövid szünet
+  delay(200);
+
+  // Befejező fanfár
+  tone(BUZZER_PIN, 1047);
+  delay(200);
+  noTone(BUZZER_PIN);
+  delay(30); // C6
+  tone(BUZZER_PIN, 1047);
+  delay(200);
+  noTone(BUZZER_PIN);
+  delay(30); // C6
+  tone(BUZZER_PIN, 1047);
+  delay(400);
+  noTone(BUZZER_PIN);
+  delay(50); // C6
+
+  // Végső akkord
+  tone(BUZZER_PIN, 523);
+  delay(50); // C5
+  tone(BUZZER_PIN, 659);
+  delay(50); // E5
+  tone(BUZZER_PIN, 784);
+  delay(50); // G5
+  tone(BUZZER_PIN, 1047);
+  delay(800);
+  noTone(BUZZER_PIN); // C6
 }
 
 void startupTone()
@@ -554,8 +681,8 @@ void PidDrive(double distanceFromMiddle, int maxSpeed, bool isThereAWall)
   input = distanceFromMiddle;
   pid.Compute();
   // Motorok vezérlése a PID kimenet alapján
-  int motorSpeedLeft = constrain(maxSpeed - output, -50, 255);  // Bal motor sebessége
-  int motorSpeedRight = constrain(maxSpeed + output, -50, 255); // Jobb motor sebessége
+  int motorSpeedLeft = constrain(maxSpeed - output, motorMinSpeed, motorMaxSpeed);  // Bal motor sebessége
+  int motorSpeedRight = constrain(maxSpeed + output, motorMinSpeed, motorMaxSpeed); // Jobb motor sebessége
 
   // Motorok mozgatása
   drive(motorSpeedLeft, motorSpeedRight);
@@ -583,7 +710,7 @@ void forwardWithAlignment(int maxSpeed)
   if (thereIsAWall(DIRECTION_LEFT) && thereIsAWall(DIRECTION_RIGHT))
   {
     double distanceFromMiddle = (distances[DIRECTION_RIGHT] - distances[DIRECTION_LEFT]);
-    if(distances[DIRECTION_LEFT] < distances[DIRECTION_RIGHT])
+    if (distances[DIRECTION_LEFT] < distances[DIRECTION_RIGHT])
     {
       distanceFromMiddle = (distanceFromSingleWall - distances[DIRECTION_LEFT]) * 2;
     }
