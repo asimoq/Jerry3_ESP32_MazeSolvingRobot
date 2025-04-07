@@ -1,4 +1,5 @@
 #include "pid_webinterface.h"
+#include <EEPROM.h>
 #include <vector>
 
 #define DIRECTION_FRONT 0    // 0-egyenesen
@@ -7,6 +8,14 @@
 #define DIRECTION_STOP 3     // megállás
 #define DIRECTION_START 4    // START
 #define DIRECTION_DEAD_END 5 // Zsákutca
+
+#define EEPROM_SIZE 512
+#define EEPROM_VALID_FLAG 0xAA // Jelzőbit az érvényes adatokhoz
+
+String generateFormFields();
+void saveAllSettingsToEEPROM();
+bool loadAllSettingsFromEEPROM();
+void handleSaveToEEPROM();
 
 struct WebVariable
 {
@@ -43,135 +52,175 @@ String generateHtml()
   <title>ESP32 Változó Beállító</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-      body { font-family: Arial; margin: 20px; }
-      .container { max-width: 600px; margin: 0 auto; }
-      .form-group { margin-bottom: 15px; }
-      label { display: block; margin-bottom: 5px; font-weight: bold; }
-      input { width: 100%; padding: 8px; box-sizing: border-box; }
-      button { background-color: #4CAF50; color: white; padding: 10px 15px; border: none; cursor: pointer; }
-      .current-value { color: #666; margin-bottom: 5px; }
-      .success { color: green; margin: 10px 0; }
-      .web-button { 
-        background-color:rgb(255, 222, 34); 
-        color: white; 
-        padding: 15px 20px; 
-        font-size: 18px; 
-        margin-bottom: 20px;
-        width: 100%;
-        border-radius: 5px;
-      }
-      .distances {
-        display: flex;
-        justify-content: space-between;
-        margin: 20px 0;
-      }
-      .distance-box {
-        padding: 10px;
-        background-color: #f1f1f1;
-        border-radius: 5px;
-        width: 30%;
-        text-align: center;
-      }
+    body { font-family: Arial; margin: 20px; }
+    .container { max-width: 600px; margin: 0 auto; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    input { width: 100%; padding: 8px; box-sizing: border-box; }
+    button { background-color: #4CAF50; color: white; padding: 10px 15px; border: none; cursor: pointer; margin-right: 5px; }
+    .current-value { color: #666; margin-bottom: 5px; }
+    .success { color: green; margin: 10px 0; }
+    .web-button { 
+      background-color: rgb(255, 222, 34); 
+      color: white; 
+      padding: 15px 20px; 
+      font-size: 18px; 
+      margin-bottom: 20px;
+      width: 100%;
+      border-radius: 5px;
+    }
+    .distances {
+      display: flex;
+      justify-content: space-between;
+      margin: 20px 0;
+    }
+    .distance-box {
+      padding: 10px;
+      background-color: #f1f1f1;
+      border-radius: 5px;
+      width: 30%;
+      text-align: center;
+    }
+    .button-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 15px;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-      <h1>ESP32 Változó Beállító</h1>
-      %SUCCESS_MESSAGE%
-      <button onclick="pressButton()" class="web-button">VIRTUÁLIS GOMB</button>
-      <div id="distances">
+    <h1>ESP32 Változó Beállító</h1>
+    %SUCCESS_MESSAGE%
+    <button onclick="pressButton()" class="web-button">VIRTUÁLIS GOMB</button>
+    <div id="distances">
       <h2>Távolságok</h2>
       <p>Elöl: <span id="distance-front"></span> cm</p>
       <p>Bal: <span id="distance-left"></span> cm</p>
       <p>Jobb: <span id="distance-right"></span> cm</p>
+    </div>
+    <form action="/update" method="post">
+)=====" + generateFormFields() +
+                R"=====(
+      <div class="button-group">
+        <button type='button' onclick='saveNormalSettings()' class='button' style='background-color: #FF5722;'>Normál beállítások mentése</button>
+        <button type='button' onclick='loadNormalSettings()' class='button'>Normál beállítások betöltése</button>
+        <button type='button' onclick='saveSprintSettings()' class='button' style='background-color: #FF5722;'>Sprint beállítások mentése</button>
+        <button type='button' onclick='loadSprintSettings()' class='button'>Sprint beállítások betöltése</button>
+        <button type='button' onclick='saveToEEPROM()' class='button' style='background-color:rgb(255, 60, 0);'>Mentés EEPROM-ba</button>
       </div>
-      <form action="/update" method="post">
-)=====";
-
-  // Minden változóhoz HTML elem generálása
-  for (const auto &var : webVariables)
-  {
-    html += "<div class=\"form-group\">";
-    html += "<label for=\"" + var.id + "\">" + var.name + "</label>";
-    if (var.description.length() > 0)
-    {
-      html += "<p>" + var.description + "</p>";
-    }
-    html += "<p class=\"current-value\">Jelenlegi érték: " + String(*var.value) + "</p>";
-    html += "<input type=\"number\" step=\"any\" id=\"" + var.id + "\" name=\"" + var.id +
-            "\" value=\"" + String(*var.value) + "\" min=\"" + String(var.minValue) +
-            "\" max=\"" + String(var.maxValue) + "\">";
-    html += "</div>";
-  }
-  html += "<div style='margin-top: 15px;'>";
-  html += "<button type='button' onclick='saveSettings()' class='button'>Beállítások mentése</button> ";
-  html += "<button type='button' onclick='loadSettings()' class='button'>Beállítások betöltése</button>";
-  html += "</div>";
-  html += R"=====(
-          <br> 
-          <br> 
-        <button type="submit">Értékek frissítése</button>
-      </form>
+      <br><br>
+      <button type="submit">Értékek frissítése</button>
+    </form>
   </div>
-</body>
-<script>
- function pressButton() {
-        fetch('/button')
-          .then(response => {
-            if(response.ok) {
-              alert('Gomb aktiválva!');
-            }
-          })
-          .catch(error => console.error('Hiba:', error));
+  <script>
+    function pressButton() {
+      fetch('/button')
+        .then(response => {
+          if(response.ok) {
+            alert('Gomb aktiválva!');
+          }
+        })
+        .catch(error => console.error('Hiba:', error));
+    }
+
+    function updateDistances() {
+      fetch('/distances')
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('distance-front').textContent = data.front;
+          document.getElementById('distance-left').textContent = data.left;
+          document.getElementById('distance-right').textContent = data.right;
+        });
+    }
+
+    setInterval(updateDistances, 100);
+
+    function saveNormalSettings() {
+      const settings = {};
+      document.querySelectorAll('input[type="number"]').forEach(input => {
+        settings[input.id] = parseFloat(input.value);
+      });
+      localStorage.setItem('normalSettings', JSON.stringify(settings));
+      alert('Normál beállítások sikeresen elmentve!');
+    }
+
+    function loadNormalSettings() {
+      const savedSettings = localStorage.getItem('normalSettings');
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        for (const id in settings) {
+          const input = document.getElementById(id);
+          if (input) {
+            input.value = settings[id];
+          }
+        }
+        alert('Normál beállítások sikeresen betöltve!');
+      } else {
+        alert('Nincsenek mentett normál beállítások!');
       }
+    }
 
-function updateDistances() {
-  fetch('/distances')
-    .then(response => response.json())
-    .then(data => {
-      document.getElementById('distance-front').textContent = data.front;
-      document.getElementById('distance-left').textContent = data.left;
-      document.getElementById('distance-right').textContent = data.right;
-    });
-}
-    
+    function saveSprintSettings() {
+      const settings = {};
+      document.querySelectorAll('input[type="number"]').forEach(input => {
+        settings[input.id] = parseFloat(input.value);
+      });
+      localStorage.setItem('sprintSettings', JSON.stringify(settings));
+      alert('Sprint beállítások sikeresen elmentve!');
+    }
 
-setInterval(updateDistances, 100); // Frissítés másodpercenként
-
-</script>)=====";
-  // JavaScript kód a HTML-be
-  html += "<script>";
-  html += "function saveSettings() {";
-  html += "  const settings = {};";
-  // Minden változó értékének kiolvasása és mentése
-  html += "  document.querySelectorAll('input[type=\"number\"]').forEach(input => {";
-  html += "    settings[input.id] = parseFloat(input.value);";
-  html += "  });";
-  html += "  localStorage.setItem('pidSettings', JSON.stringify(settings));";
-  html += "  alert('Beállítások sikeresen elmentve!');";
-  html += "}";
-  html += "";
-  html += "function loadSettings() {";
-  html += "  const savedSettings = localStorage.getItem('pidSettings');";
-  html += "  if (savedSettings) {";
-  html += "    const settings = JSON.parse(savedSettings);";
-  html += "    for (const id in settings) {";
-  html += "      const input = document.getElementById(id);";
-  html += "      if (input) {";
-  html += "        input.value = settings[id];";
-  html += "      }";
-  html += "    }";
-  html += "    alert('Beállítások sikeresen betöltve!');";
-  html += "  } else {";
-  html += "    alert('Nincsenek mentett beállítások!');";
-  html += "  }";
-  html += "}";
-  html += "</script>";
-  html += R"=====(
+    function loadSprintSettings() {
+      const savedSettings = localStorage.getItem('sprintSettings');
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        for (const id in settings) {
+          const input = document.getElementById(id);
+          if (input) {
+            input.value = settings[id];
+          }
+        }
+        alert('Sprint beállítások sikeresen betöltve!');
+      } else {
+        alert('Nincsenek mentett sprint beállítások!');
+      }
+    }
+    function saveToEEPROM() {
+    fetch('/save-to-eeprom')
+      .then(response => {
+        if(response.ok) {
+          alert('Beállítások sikeresen mentve EEPROM-ba!');
+        }
+      })
+      .catch(error => console.error('Hiba:', error));
+    }
+  </script>
+</body>
 </html>
 )=====";
 
   return html;
+}
+
+String generateFormFields()
+{
+  String fields;
+  for (const auto &var : webVariables)
+  {
+    fields += "<div class=\"form-group\">";
+    fields += "<label for=\"" + var.id + "\">" + var.name + "</label>";
+    if (var.description.length() > 0)
+    {
+      fields += "<p>" + var.description + "</p>";
+    }
+    fields += "<p class=\"current-value\">Jelenlegi érték: " + String(*var.value) + "</p>";
+    fields += "<input type=\"number\" step=\"any\" id=\"" + var.id + "\" name=\"" + var.id +
+              "\" value=\"" + String(*var.value) + "\" min=\"" + String(var.minValue) +
+              "\" max=\"" + String(var.maxValue) + "\">";
+    fields += "</div>";
+  }
+  return fields;
 }
 
 bool variablesUpdated = false;
@@ -314,6 +363,7 @@ void setupPidWebInterface(const char *ssid, const char *password)
   server.on("/update", HTTP_POST, handleUpdate);
   server.on("/distances", HTTP_GET, handleDistances);
   server.on("/button", HTTP_GET, handleButton);
+  server.on("/save-to-eeprom", HTTP_GET, handleSaveToEEPROM);
 
   // Webszerver indítása
   server.begin();
@@ -325,9 +375,76 @@ void setupPidWebInterface(const char *ssid, const char *password)
   addWebVariable("single_wall", "Faltól tartott távolság", "Távolság(cm)", &distanceFromSingleWall, 0, 50);
   addWebVariable("forward_max_speed", "Maximális sebesség", "Sebesség(0-255)", &forwardMaxSpeed, 0, 255);
   addWebVariable("distanceFromFrontWall", "Előre tartott távolság", "Távolság(cm)", &distanceFromFrontWall, 0, 50);
+  addWebVariable("delay_time", "Időzítés", "Idő(ms)", &delayBeforeTurn, 0, 5000);
+
+  // EEPROM inicializálása
+  if (!EEPROM.begin(EEPROM_SIZE))
+  {
+    Serial.println("Hiba az EEPROM inicializálásakor!");
+    delay(1000);
+    beep(10);
+    ESP.restart();
+  }
+
+  // Adatok betöltése EEPROM-ból, ha van
+  if (loadAllSettingsFromEEPROM())
+  {
+    Serial.println("Beállítások sikeresen betöltve az EEPROM-ból!");
+    beep(2);
+  }
+  else
+  {
+    Serial.println("Nincsenek mentett beállítások az EEPROM-ban.");
+  }
 }
 
 void handlePidWebClient()
 {
   server.handleClient();
+}
+
+void handleSaveToEEPROM()
+{
+  saveAllSettingsToEEPROM();
+  server.send(200, "text/plain", "Beállítások sikeresen mentve EEPROM-ba!");
+  beep(3);
+}
+// Függvény az összes változó mentéséhez az EEPROM-ba
+void saveAllSettingsToEEPROM()
+{
+  int address = 1; // Az első byte a jelzőbit
+
+  // Jelöljük, hogy van mentett adat
+  EEPROM.write(0, EEPROM_VALID_FLAG);
+
+  // Minden webVariable mentése
+  for (const auto &var : webVariables)
+  {
+    EEPROM.put(address, *var.value);
+    address += sizeof(double); // Minden változó double típusú
+  }
+
+  // Commit a változtatásokat
+  EEPROM.commit();
+  Serial.println("Beállítások mentve az EEPROM-ba!");
+}
+
+// Függvény az összes változó betöltéséhez az EEPROM-ból
+bool loadAllSettingsFromEEPROM()
+{
+  // Ellenőrizzük, hogy van-e érvényes adat
+  if (EEPROM.read(0) != EEPROM_VALID_FLAG)
+  {
+    return false; // Nincs érvényes adat
+  }
+
+  int address = 1; // Az első byte a jelzőbit
+
+  // Minden webVariable betöltése
+  for (const auto &var : webVariables)
+  {
+    EEPROM.get(address, *var.value);
+    address += sizeof(double);
+  }
+  return true; // Sikeres betöltés
 }

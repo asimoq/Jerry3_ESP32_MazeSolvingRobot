@@ -76,6 +76,7 @@ int forwardProportionalSpeed = forwardMaxSpeed - forwardMinSpeed;
 int turnMaxSpeed = 180;
 int turnMinSpeed = 120;
 int turnProportionalSpeed = turnMaxSpeed - turnMinSpeed;
+double delayBeforeTurn = 700; // millisec
 
 // PID változók   //100 hoz egsz okes: 0.3 0.3 0.9  //60hoz:
 int pidmode = 2;
@@ -111,6 +112,7 @@ int rfidToDirection(int *dirs);
 void orientRobot(double desiredAngle);
 void handlePidSettings();
 double kalmanFilter(double measurement, KalmanFilter *filter);
+void delayWithForwardWithAlignment(double delayTime, int maxSpeed);
 
 void setup()
 {
@@ -187,7 +189,6 @@ void loop()
   // PID webinterface kezelése
   measureDistanceAllDirections();
   handlePidSettings();
-  pid.SetTunings(Pid_P, Pid_I, Pid_D);
   while (distances[DIRECTION_FRONT] > distanceFromFrontWall)
   {
     measureDistanceAllDirections();
@@ -197,16 +198,16 @@ void loop()
     switch (rfidToDirection(commands))
     {
     case DIRECTION_LEFT:
-      delay(1000);
+      delayWithForwardWithAlignment(delayBeforeTurn, forwardMaxSpeed);
       turnLeft(85);
       break;
     case DIRECTION_RIGHT:
-      delay(1000);
+      delayWithForwardWithAlignment(delayBeforeTurn, forwardMaxSpeed);
       turnRight(85);
       break;
     case DIRECTION_STOP:
       stop();
-      drive(90, -90);
+      drive(150, -150);
       delay(2000);
       while (true)
       {
@@ -222,18 +223,31 @@ void loop()
   if (distances[DIRECTION_LEFT] >= distances[DIRECTION_RIGHT])
   {
     turnLeft(85);
-    for (size_t i = 0; i < 10; i++)
+    for (size_t i = 0; i < 40; i++)
     {
       measureDistanceAllDirections();
     }
+    drive(250, 250);
   }
   else
   {
     turnRight(85);
-    for (size_t i = 0; i < 10; i++)
+    for (size_t i = 0; i < 40; i++)
     {
       measureDistanceAllDirections();
     }
+    drive(250, 250);
+  }
+}
+
+void delayWithForwardWithAlignment(double delayTimeDouble, int maxSpeed)
+{
+  unsigned long startTime = millis();
+  int delayTime = int(delayTimeDouble); // millis() nem fogad el double-t
+  while (millis() - startTime < delayTime)
+  {
+    measureDistanceAllDirections();
+    forwardWithAlignment(maxSpeed);
   }
 }
 
@@ -249,9 +263,21 @@ void beep(int number)
   for (size_t i = 0; i < number; i++)
   {
     tone(BUZZER_PIN, 1000 / (i + 1));
-    delay(250 / number); // Fél másodpercig töredékéig szól amekkora szám annyi részre osztja
+    delay(100 / number); // Fél másodpercig töredékéig szól amekkora szám annyi részre osztja
     noTone(BUZZER_PIN);
-    delay(250 / number); // Fél másodpercig töredékéig csönd amekkora szám annyi részre osztja
+    delay(100 / number); // Fél másodpercig töredékéig csönd amekkora szám annyi részre osztja
+  }
+}
+
+void beepWithForwardWithAlighnment(int number)
+{
+  // 1000 Hz-es hang generálása
+  for (size_t i = 0; i < number; i++)
+  {
+    tone(BUZZER_PIN, 1000 / (i + 1));
+    delayWithForwardWithAlignment((100 / number), forwardMaxSpeed); // 0.1 másodpercig töredékéig szól amekkora szám annyi részre osztja
+    noTone(BUZZER_PIN);
+    delayWithForwardWithAlignment((100 / number), forwardMaxSpeed); // 0.1 másodpercig töredékéig csönd amekkora szám annyi részre osztja
   }
 }
 
@@ -260,9 +286,9 @@ void startupTone()
   for (size_t i = 5; i > 0; i--)
   {
     tone(BUZZER_PIN, 1000 / (i + 1));
-    delay(250 / i); // Fél másodpercig töredékéig szól amekkora szám annyi részre osztja
+    delay(100 / i); // Fél másodpercig töredékéig szól amekkora szám annyi részre osztja
     noTone(BUZZER_PIN);
-    delay(250 / i); // Fél másodpercig töredékéig csönd amekkora szám annyi részre osztja
+    delay(100 / i); // Fél másodpercig töredékéig csönd amekkora szám annyi részre osztja
   }
 }
 
@@ -281,9 +307,15 @@ void checkButton()
       measureDistanceAllDirections();
     }
     {
+
       webButtonPressed = false;
       beep(2);
       delay(500);
+      // RFID olvasó újrainicializálása itt
+      SPI.begin();
+      mfrc522.PCD_Init();
+      mfrc522.PCD_DumpVersionToSerial();
+      mfrc522.PCD_SetAntennaGain(mfrc522.RxGain_max);
     }
   }
 }
@@ -548,9 +580,17 @@ void forwardWithAlignment(int maxSpeed)
   // mindkét oldalt van fal
   if (thereIsAWall(DIRECTION_LEFT) && thereIsAWall(DIRECTION_RIGHT))
   {
-
-    // Számold ki a középső távolságot a jobb és bal oldali távolságok alapján
     double distanceFromMiddle = (distances[DIRECTION_RIGHT] - distances[DIRECTION_LEFT]);
+    if(distances[DIRECTION_LEFT] < distances[DIRECTION_RIGHT])
+    {
+      distanceFromMiddle = (distanceFromSingleWall - distances[DIRECTION_LEFT]) * 2;
+    }
+    else
+    {
+      distanceFromMiddle = (distances[DIRECTION_RIGHT] - distanceFromSingleWall) * 2;
+    }
+    // Számold ki a középső távolságot a jobb és bal oldali távolságok alapján
+    // double distanceFromMiddle = (distances[DIRECTION_RIGHT] - distances[DIRECTION_LEFT]);
 
     PidDrive(distanceFromMiddle, maxSpeed, true);
   }
@@ -576,7 +616,7 @@ void forwardWithAlignment(int maxSpeed)
   if (!thereIsAWall(DIRECTION_LEFT) && !thereIsAWall(DIRECTION_RIGHT))
   {
     float angle = mpu.getAngleZ();
-    double error = (angle - lastCorrectAngle) * 0.07; // gyro alapján egyenesen a legutóbbi helyezkedéstől(falhoz igazítás vagy fordulás) számolva tartja a szöget elvileg :D
+    double error = (angle - lastCorrectAngle) * 0.5; // gyro alapján egyenesen a legutóbbi helyezkedéstől(falhoz igazítás vagy fordulás) számolva tartja a szöget elvileg :D
     PidDrive(error, maxSpeed, false);
   }
 }
@@ -585,7 +625,7 @@ void forwardWithAlignment(int maxSpeed)
 //  dirs pointer opcionális az első fordulóban.
 int rfidToDirection(int *dirs = nullptr)
 {
-  int retVal[4] = {0};
+  int retVal[4] = {0, 0, 0, 0};
   if (dirs == nullptr)
   {
     dirs = retVal;
@@ -601,7 +641,7 @@ int rfidToDirection(int *dirs = nullptr)
   {
     return -1;
   }
-  beep(1);
+  beepWithForwardWithAlighnment(1);
   if ((mfrc522.uid.uidByte[1] == 0xBC))
   {
     switch (mfrc522.uid.uidByte[2] & 0xF0)
@@ -663,10 +703,9 @@ int rfidToDirection(int *dirs = nullptr)
       break;
     }
   }
-  mfrc522.PICC_HaltA();
+
   return dirs[0];
 }
-
 
 double kalmanFilter(double measurement, KalmanFilter *filter)
 {

@@ -12,6 +12,7 @@ extern double distanceFromSingleWall;
 extern double distances[3];
 extern double forwardMaxSpeed;
 extern double distanceFromFrontWall;
+extern double delayBeforeTurn;
 extern bool webButtonPressed;
 extern WebServer server;
 extern void beep(int number);
