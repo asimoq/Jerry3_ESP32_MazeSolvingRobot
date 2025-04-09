@@ -116,6 +116,7 @@ void orientRobot(double desiredAngle);
 void handlePidSettings();
 double kalmanFilter(double measurement, KalmanFilter *filter);
 void delayWithForwardWithAlignment(double delayTime, int maxSpeed);
+void alignToFrontWallBeforeTurnIfThereIsOne(int forwardMaxSpeed);
 
 void setup()
 {
@@ -202,17 +203,19 @@ void loop()
     {
     case DIRECTION_LEFT:
       delayWithForwardWithAlignment(delayBeforeTurn, forwardMaxSpeed);
+      alignToFrontWallBeforeTurnIfThereIsOne(forwardMaxSpeed);
       turnLeft(85);
       break;
     case DIRECTION_RIGHT:
       delayWithForwardWithAlignment(delayBeforeTurn, forwardMaxSpeed);
+      alignToFrontWallBeforeTurnIfThereIsOne(forwardMaxSpeed);
       turnRight(85);
       break;
     case DIRECTION_STOP:
       stop();
       
       finishTone();
-      drive(250, -250);
+      drive(200, -200);
       delay(2000);
       stop();
       while (digitalRead(BUTTON_PIN) == LOW)
@@ -222,7 +225,9 @@ void loop()
       SPI.begin();
       mfrc522.PCD_Init();
       break;
-
+    case DIRECTION_START:
+      beepWithForwardWithAlighnment(4);
+      break;
     default:
       break;
     }
@@ -235,7 +240,7 @@ void loop()
     {
       measureDistanceAllDirections();
     }
-    drive(250, 250);
+    drive(200, 200);
   }
   else
   {
@@ -244,9 +249,20 @@ void loop()
     {
       measureDistanceAllDirections();
     }
-    drive(250, 250);
+    drive(200, 200);
   }
 }
+
+void alignToFrontWallBeforeTurnIfThereIsOne(int forwardMaxSpeed){
+  if(distances[DIRECTION_FRONT] <= 20){
+    while (distances[DIRECTION_FRONT] >= distanceFromFrontWall)
+    {
+      measureDistanceAllDirections();
+      forwardWithAlignment(forwardMaxSpeed);
+    }
+  }
+}
+
 
 void delayWithForwardWithAlignment(double delayTimeDouble, int maxSpeed)
 {
@@ -745,7 +761,7 @@ void forwardWithAlignment(int maxSpeed)
   if (!thereIsAWall(DIRECTION_LEFT) && !thereIsAWall(DIRECTION_RIGHT))
   {
     float angle = mpu.getAngleZ();
-    double error = (angle - lastCorrectAngle) * 0.5; // gyro alapján egyenesen a legutóbbi helyezkedéstől(falhoz igazítás vagy fordulás) számolva tartja a szöget elvileg :D
+    double error = (angle - lastCorrectAngle) * 0.2; // 0.5-volt // gyro alapján egyenesen a legutóbbi helyezkedéstől(falhoz igazítás vagy fordulás) számolva tartja a szöget elvileg :D
     PidDrive(error, maxSpeed, false);
   }
 }
