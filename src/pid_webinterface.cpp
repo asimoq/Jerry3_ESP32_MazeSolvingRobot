@@ -104,11 +104,13 @@ String generateHtml()
 )=====" + generateFormFields() +
                 R"=====(
       <div class="button-group">
-        <button type='button' onclick='saveNormalSettings()' class='button' style='background-color: #FF5722;'>Normál beállítások mentése</button>
+        <button type='button' onclick='saveNormalSettings()' class='button' style='background-color:rgb(255, 87, 34);'>Normál beállítások mentése</button>
         <button type='button' onclick='loadNormalSettings()' class='button'>Normál beállítások betöltése</button>
-        <button type='button' onclick='saveSprintSettings()' class='button' style='background-color: #FF5722;'>Sprint beállítások mentése</button>
+        <button type='button' onclick='saveSpeedySettings()' class='button' style='background-color:rgb(255, 244, 34);'>Speedy beállítások mentése</button>
+        <button type='button' onclick='loadSpeedySettings()' class='button'>Speedy beállítások betöltése</button>
+        <button type='button' onclick='saveSprintSettings()' class='button' style='background-color:rgb(34, 255, 152);'>Sprint beállítások mentése</button>
         <button type='button' onclick='loadSprintSettings()' class='button'>Sprint beállítások betöltése</button>
-        <button type='button' onclick='saveToEEPROM()' class='button' style='background-color:rgb(255, 60, 0);'>Mentés EEPROM-ba</button>
+        <button type='button' onclick='saveToEEPROM()' class='button' style='background-color:rgb(255, 0, 0);'>Mentés EEPROM-ba</button>
       </div>
       <br><br>
       <button type="submit">Értékek frissítése</button>
@@ -159,6 +161,31 @@ String generateHtml()
         alert('Normál beállítások sikeresen betöltve!');
       } else {
         alert('Nincsenek mentett normál beállítások!');
+      }
+    }
+
+    function saveSpeedySettings() {
+      const settings = {};
+      document.querySelectorAll('input[type="number"]').forEach(input => {
+        settings[input.id] = parseFloat(input.value);
+      });
+      localStorage.setItem('speedySettings', JSON.stringify(settings));
+      alert('Normál beállítások sikeresen elmentve!');
+    }
+
+    function loadSpeedySettings() {
+      const savedSettings = localStorage.getItem('speedySettings');
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        for (const id in settings) {
+          const input = document.getElementById(id);
+          if (input) {
+            input.value = settings[id];
+          }
+        }
+        alert('Speedy beállítások sikeresen betöltve!');
+      } else {
+        alert('Nincsenek mentett speedy beállítások!');
       }
     }
 
