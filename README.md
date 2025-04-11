@@ -1,31 +1,74 @@
-I'm excited to share our team's (Jerry Team) latest maze-solving robot that we've built for the "Mobile Robots in the Maze" competition at Óbuda University, Hungary. This is our third-generation robot, and we've made significant improvements based on our experiences from previous years.
+# Jerry 3.0 – Maze-Solving Robot
 
-In previous competitions, we used Arduino-based controllers, but this year we've upgraded to an ESP32, which has been a game-changer for our robot's capabilities and development process.
+We're excited to share our team's (Jerry Team) latest maze-solving robot, built for the **"Mobile Robots in the Maze"** competition at **Óbuda University, Hungary**. This is our **third-generation robot**, and it features major upgrades based on the lessons we've learned from previous years.
 
-About the Robot:
+In earlier competitions, we used Arduino-based controllers, but this year we've upgraded to an **ESP32**, which has significantly improved our robot’s performance and development workflow.
 
-Jerry 3.0 is a compact (16×16 cm) maze-solving robot that navigates using an ESP32 as its brain. The ESP32 WROOM 32 microcontroller on our Wemos D1 R32 board handles all the sensor processing and motor control with its impressive 240MHz dual-core processor and abundant I/O capabilities.
+---
 
-One of the most valuable features we've implemented is utilizing the ESP32's WiFi capabilities to create a web interface for real-time monitoring and tuning. During testing, we set up the ESP32 in SoftAP mode, allowing us to connect directly to the robot with our phones. Through this interface, we can view live sensor data, adjust PID parameters, and even load different profiles (like "sprint mode" for maximum speed or more conservative settings for precise navigation). This has been incredibly helpful for fine-tuning the robot's behavior without having to reprogram it constantly.
+## About the Robot
 
-The robot uses infrared distance sensors to detect walls and maintain its position in the maze corridors. We've implemented a Kalman filter for the sensor readings to reduce noise and improve accuracy. For navigation, we use an RFID reader (connected via SPI, not I2C as we initially planned) to read tags placed throughout the maze that contain directional information.
+**Jerry 3.0** is a compact, 16×16 cm robot designed to solve mazes autonomously. It’s powered by an **ESP32 WROOM-32** microcontroller on a **Wemos D1 R32** board, which handles all sensor processing and motor control thanks to its powerful **240 MHz dual-core processor** and extensive I/O support.
 
-The robot's movement is controlled by two DC motors with an L298N motor driver, allowing for tank-style steering. We've also added an MPU-6050 accelerometer to precisely measure rotation angles during turns, which has significantly improved our navigation accuracy compared to previous versions.
+### Key Features
 
-Technical Details:
+- **Web Interface via WiFi**  
+  We leverage the ESP32’s built-in WiFi by putting it in SoftAP mode, which allows us to connect directly to the robot from our phones.  
+  Through a custom web interface, we can:
+  - View live sensor data
+  - Tune PID parameters
+  - Switch between profiles (e.g., "sprint mode" or "precision mode")  
+  This real-time tuning has dramatically streamlined our testing process.
 
-The code is structured around several key components:
+- **Infrared Sensors & Kalman Filtering**  
+  The robot uses **IR distance sensors** to detect and follow maze walls. We apply a **Kalman filter** to reduce sensor noise and improve accuracy.
 
-Sensor Processing: The ESP32 reads data from three IR distance sensors and processes it through Kalman filters to get stable distance measurements.
-PID Control: We use a PID controller for wall following, which keeps the robot centered in corridors or at a consistent distance from a single wall.
-RFID Navigation: The MFRC522 RFID reader detects tags in the maze that contain navigation instructions.
-Web Interface: The ESP32 hosts a web server that displays real-time sensor data and allows parameter adjustments. This has been invaluable during development and testing.
-Motion Control: The robot can perform precise turns using gyroscope feedback and adjusts its speed based on the distance to obstacles.
-The most challenging part was getting the wall-following algorithm to work reliably. Our solution adapts to different scenarios: when there are walls on both sides, it centers itself; when there's only one wall, it maintains a fixed distance; and when there are no walls, it uses gyroscope data to maintain its heading.
+- **RFID Navigation**  
+  An **MFRC522 RFID reader** (connected via SPI) detects directional tags placed throughout the maze, helping the robot make smarter navigation decisions.
 
-What We've Learned:
+- **Motion Control**  
+  Two **DC motors** with an **L298N driver** provide tank-style movement. An **MPU-6050 accelerometer/gyroscope** measures rotation during turns, allowing for accurate and consistent movement.
 
-Moving from Arduino to ESP32 has been a significant upgrade. The additional processing power allows us to implement more complex algorithms, and the WiFi capability has transformed our development process. Being able to tune parameters in real-time without connecting to a computer has saved us countless hours during testing.
+---
 
-The ESP32's dual-core architecture also lets us handle multiple tasks simultaneously without performance issues. One core handles the sensor readings and motor control, while the other manages the web interface and communication.
+## Technical Overview
 
+### System Components
+
+- **Sensor Processing**  
+  Reads from 3 IR sensors and applies Kalman filters for stable distance measurements.
+
+- **PID Control**  
+  Used for wall following: keeps the robot centered or maintains a constant distance from a single wall.
+
+- **RFID Navigation**  
+  Reads maze navigation tags with the MFRC522 module via SPI.
+
+- **Web Interface**  
+  Hosted by the ESP32’s built-in server. Enables real-time monitoring and live tuning without reprogramming.
+
+- **Motion Control**  
+  Gyroscope-assisted turns and dynamic speed adjustments based on obstacle distance.
+
+---
+
+## Wall-Following Algorithm
+
+This was one of the biggest challenges. Our adaptive wall-following logic:
+- Centers the robot when walls are detected on both sides
+- Maintains a set distance if only one wall is detected
+- Relies on gyroscope data to maintain heading when no walls are present
+
+---
+
+## What We’ve Learned
+
+- Switching from Arduino to **ESP32** was a huge leap forward.  
+- The extra processing power enabled more complex algorithms.
+- Real-time tuning via WiFi saved countless hours during testing.
+- The **dual-core architecture** lets us run sensor control and web communication in parallel, eliminating performance bottlenecks.
+
+---
+
+Thanks for checking out Jerry 3.0!  
+We hope this inspires others building robots for maze-solving challenges.
