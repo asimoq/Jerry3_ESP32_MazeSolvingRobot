@@ -186,6 +186,10 @@ void setup()
     beep(3);
     delay(500);
   }
+  SPI.begin();
+  mfrc522.PCD_Init();
+  mfrc522.PCD_DumpVersionToSerial();
+  mfrc522.PCD_SetAntennaGain(mfrc522.RxGain_max);
 }
 
 void loop()
@@ -203,17 +207,15 @@ void loop()
     {
     case DIRECTION_LEFT:
       delayWithForwardWithAlignment(delayBeforeTurn, forwardMaxSpeed);
-      alignToFrontWallBeforeTurnIfThereIsOne(forwardMaxSpeed);
       turnLeft(85);
       break;
     case DIRECTION_RIGHT:
       delayWithForwardWithAlignment(delayBeforeTurn, forwardMaxSpeed);
-      alignToFrontWallBeforeTurnIfThereIsOne(forwardMaxSpeed);
       turnRight(85);
       break;
     case DIRECTION_STOP:
       stop();
-      
+
       finishTone();
       drive(200, -200);
       delay(2000);
@@ -253,8 +255,10 @@ void loop()
   }
 }
 
-void alignToFrontWallBeforeTurnIfThereIsOne(int forwardMaxSpeed){
-  if(distances[DIRECTION_FRONT] <= 20){
+void alignToFrontWallBeforeTurnIfThereIsOne(int forwardMaxSpeed)
+{
+  if (distances[DIRECTION_FRONT] <= 20)
+  {
     while (distances[DIRECTION_FRONT] >= distanceFromFrontWall)
     {
       measureDistanceAllDirections();
@@ -262,7 +266,6 @@ void alignToFrontWallBeforeTurnIfThereIsOne(int forwardMaxSpeed){
     }
   }
 }
-
 
 void delayWithForwardWithAlignment(double delayTimeDouble, int maxSpeed)
 {
@@ -848,7 +851,7 @@ int rfidToDirection(int *dirs = nullptr)
       break;
     }
   }
-
+  mfrc522.PICC_HaltA();
   return dirs[0];
 }
 
