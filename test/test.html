@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ESP32 Változó Beállító</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    .container { max-width: 600px; margin: 0 auto; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    input { width: 100%; padding: 8px; box-sizing: border-box; }
+    button { background-color: #4CAF50; color: white; padding: 10px 15px; border: none; cursor: pointer; margin-right: 5px; }
+    .current-value { color: #666; margin-bottom: 5px; }
+    .success { color: green; margin: 10px 0; }
+    .web-button { 
+      background-color: rgb(255, 222, 34); 
+      color: white; 
+      padding: 15px 20px; 
+      font-size: 18px; 
+      margin-bottom: 20px;
+      width: 100%;
+      border-radius: 5px;
+    }
+    .distances {
+      display: flex;
+      justify-content: space-between;
+      margin: 20px 0;
+    }
+    .distance-box {
+      padding: 10px;
+      background-color: #f1f1f1;
+      border-radius: 5px;
+      width: 30%;
+      text-align: center;
+    }
+    .button-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>ESP32 Változó Beállító</h1>
+    %SUCCESS_MESSAGE%
+    <button onclick="pressButton()" class="web-button">VIRTUÁLIS GOMB</button>
+    <div id="distances">
+      <h2>Távolságok</h2>
+      <p>Elöl: <span id="distance-front"></span> cm</p>
+      <p>Bal: <span id="distance-left"></span> cm</p>
+      <p>Jobb: <span id="distance-right"></span> cm</p>
+    </div>
+    <form action="/update" method="post">
+)=====" + generateFormFields() +
+                R"=====(
+      <div class="button-group">
+        <button type='button' onclick='saveNormalSettings()' class='button' style='background-color:rgb(255, 87, 34);'>Normál beállítások mentése</button>
+        <button type='button' onclick='loadNormalSettings()' class='button'>Normál beállítások betöltése</button>
+        <button type='button' onclick='saveSpeedySettings()' class='button' style='background-color:rgb(255, 244, 34);'>Speedy beállítások mentése</button>
+        <button type='button' onclick='loadSpeedySettings()' class='button'>Speedy beállítások betöltése</button>
+        <button type='button' onclick='saveSprintSettings()' class='button' style='background-color:rgb(34, 255, 152);'>Sprint beállítások mentése</button>
+        <button type='button' onclick='loadSprintSettings()' class='button'>Sprint beállítások betöltése</button>
+        <button type='button' onclick='saveToEEPROM()' class='button' style='background-color:rgb(255, 0, 0);'>Mentés EEPROM-ba</button>
+      </div>
+      <br><br>
+      <button type="submit">Értékek frissítése</button>
+    </form>
+  </div>
+  <script>
+    function pressButton() {
+      fetch('/button')
+        .then(response => {
+          if(response.ok) {
+            alert('Gomb aktiválva!');
+          }
+        })
+        .catch(error => console.error('Hiba:', error));
+    }
+
+    function updateDistances() {
+      fetch('/distances')
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('distance-front').textContent = data.front;
+          document.getElementById('distance-left').textContent = data.left;
+          document.getElementById('distance-right').textContent = data.right;
+        });
+    }
+
+    setInterval(updateDistances, 100);
+
+    function saveNormalSettings() {
+      const settings = {};
+      document.querySelectorAll('input[type="number"]').forEach(input => {
+        settings[input.id] = parseFloat(input.value);
+      });
+      localStorage.setItem('normalSettings', JSON.stringify(settings));
+      alert('Normál beállítások sikeresen elmentve!');
+    }
+
+    function loadNormalSettings() {
+      const savedSettings = localStorage.getItem('normalSettings');
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        for (const id in settings) {
+          const input = document.getElementById(id);
+          if (input) {
+            input.value = settings[id];
+          }
+        }
+        alert('Normál beállítások sikeresen betöltve!');
+      } else {
+        alert('Nincsenek mentett normál beállítások!');
+      }
+    }
+
+    function saveSpeedySettings() {
+      const settings = {};
+      document.querySelectorAll('input[type="number"]').forEach(input => {
+        settings[input.id] = parseFloat(input.value);
+      });
+      localStorage.setItem('speedySettings', JSON.stringify(settings));
+      alert('Normál beállítások sikeresen elmentve!');
+    }
+
+    function loadSpeedySettings() {
+      const savedSettings = localStorage.getItem('speedySettings');
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        for (const id in settings) {
+          const input = document.getElementById(id);
+          if (input) {
+            input.value = settings[id];
+          }
+        }
+        alert('Speedy beállítások sikeresen betöltve!');
+      } else {
+        alert('Nincsenek mentett speedy beállítások!');
+      }
+    }
+
+    function saveSprintSettings() {
+      const settings = {};
+      document.querySelectorAll('input[type="number"]').forEach(input => {
+        settings[input.id] = parseFloat(input.value);
+      });
+      localStorage.setItem('sprintSettings', JSON.stringify(settings));
+      alert('Sprint beállítások sikeresen elmentve!');
+    }
+
+    function loadSprintSettings() {
+      const savedSettings = localStorage.getItem('sprintSettings');
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        for (const id in settings) {
+          const input = document.getElementById(id);
+          if (input) {
+            input.value = settings[id];
+          }
+        }
+        alert('Sprint beállítások sikeresen betöltve!');
+      } else {
+        alert('Nincsenek mentett sprint beállítások!');
+      }
+    }
+    function saveToEEPROM() {
+    fetch('/save-to-eeprom')
+      .then(response => {
+        if(response.ok) {
+          alert('Beállítások sikeresen mentve EEPROM-ba!');
+        }
+      })
+      .catch(error => console.error('Hiba:', error));
+    }
+  </script>
+</body>
+</html>
